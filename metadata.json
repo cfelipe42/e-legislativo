@@ -1,0 +1,7 @@
+{
+  "name": "E-Legislativo: Sistema de Votação Parlamentar Atualizado",
+  "description": "Uma plataforma completa para gestão de sessões legislativas, votações em tempo real e análise de projetos de lei com IA para câmaras de vereadores.",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}
