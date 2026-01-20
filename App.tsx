@@ -185,8 +185,43 @@ const App: React.FC = () => {
       })
       .subscribe();
 
+    // 3. Fetch History
+    const fetchHistory = async () => {
+      const { data } = await supabase.from('history').select('*').order('created_at', { ascending: false });
+      if (data) {
+        // Map DB columns to SessionHistory type if needed (snake_case to camelCase conversion mainly happens automatically if we used typed client, but here we cast)
+        // Adjusting mapping: DB "bill_id" -> Type "billId", DB "individual_votes" -> "individualVotes"
+        const formattedHistory = data.map((h: any) => ({
+          id: h.id,
+          billId: h.bill_id,
+          date: h.date,
+          result: h.result,
+          individualVotes: h.individual_votes
+        }));
+        setHistory(formattedHistory);
+      }
+    };
+    fetchHistory();
+
+    const historySub = supabase
+      .channel('public:history')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'history' }, payload => {
+        // Handle new history entry
+        const h = payload.new;
+        const newEntry: SessionHistory = {
+          id: h.id,
+          billId: h.bill_id,
+          date: h.date,
+          result: h.result,
+          individualVotes: h.individual_votes
+        };
+        setHistory(prev => [newEntry, ...prev]);
+      })
+      .subscribe();
+
     return () => {
       supabase.removeChannel(billsSub);
+      supabase.removeChannel(historySub);
     };
   }, [isAuthenticated, userCity]);
 
@@ -325,6 +360,15 @@ const App: React.FC = () => {
 
                 // UPDATE SUPABASE: Save Bill Status
                 supabase.from('bills').update({ status: newH.result.outcome }).eq('id', activeBillId).then();
+
+                // INSERT HISTORY
+                supabase.from('history').insert({
+                  id: newH.id,
+                  bill_id: newH.billId,
+                  date: newH.date,
+                  result: newH.result,
+                  individual_votes: newH.individualVotes
+                }).then();
 
                 // Clear active session in DB
                 supabase.from('chamber_configs').update({ activeBillId: null, activeSpeakerId: null }).eq('city', userCity).then();
