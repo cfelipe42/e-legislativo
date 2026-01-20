@@ -10,7 +10,7 @@ interface ModerationTabProps {
   onUpdateCouncilman: (updated: Councilman) => void;
   onAddCouncilman: (newCouncilman: Councilman) => void;
   accounts: UserAccount[];
-  onAddAccount: (newAccount: UserAccount) => void;
+  onAddAccount: (newAccount: UserAccount, linkedCouncilmanId?: string) => void;
 }
 
 const ModerationTab: React.FC<ModerationTabProps> = ({
@@ -31,6 +31,7 @@ const ModerationTab: React.FC<ModerationTabProps> = ({
   // Estados para Gestão de Vereadores
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingCouncilman, setEditingCouncilman] = useState<Councilman | null>(null);
+  const [linkingCouncilman, setLinkingCouncilman] = useState<Councilman | null>(null);
   const [formCouncilman, setFormCouncilman] = useState<Partial<Councilman>>({
     name: '',
     party: '',
@@ -99,8 +100,9 @@ const ModerationTab: React.FC<ModerationTabProps> = ({
       ...(formAccount as UserAccount),
       id: `ACC-${Date.now()}`,
     };
-    onAddAccount(newAcc);
+    onAddAccount(newAcc, linkingCouncilman?.id);
     setIsAccountModalOpen(false);
+    setLinkingCouncilman(null);
     setFormAccount({ name: '', cpf: '', password: '', role: 'councilman', city: currentCity, allowedIP: '', party: '' });
   };
 
@@ -250,6 +252,25 @@ const ModerationTab: React.FC<ModerationTabProps> = ({
                     >
                       <i className="fa-solid fa-user-gear mr-1.5"></i> Editar
                     </button>
+                    <button
+                      onClick={() => {
+                        setLinkingCouncilman(c);
+                        setFormAccount({
+                          name: c.name,
+                          cpf: '',
+                          password: '',
+                          role: 'councilman',
+                          city: c.city,
+                          allowedIP: '',
+                          party: c.party
+                        });
+                        setIsAccountModalOpen(true);
+                      }}
+                      className="flex-1 py-2 bg-purple-50 hover:bg-purple-100 text-purple-600 hover:text-purple-800 text-[9px] font-black uppercase tracking-widest rounded-xl transition-all border border-purple-100"
+                      title="Criar Login de Acesso"
+                    >
+                      <i className="fa-solid fa-key mr-1.5"></i> Criar Acesso
+                    </button>
                   </div>
                 </div>
               </div>
@@ -326,8 +347,10 @@ const ModerationTab: React.FC<ModerationTabProps> = ({
           <div className="bg-white w-full max-w-lg rounded-[2.5rem] shadow-2xl overflow-hidden border border-white/20 flex flex-col">
             <div className="p-8 border-b border-slate-100 bg-purple-50 flex items-center justify-between">
               <div>
-                <h3 className="text-xl font-black text-purple-900 tracking-tight">Novo Login Legislativo</h3>
-                <p className="text-[10px] font-bold text-purple-400 uppercase tracking-widest mt-1">Definição de credenciais de acesso</p>
+                <h3 className="text-xl font-black text-purple-900 tracking-tight">
+                  {linkingCouncilman ? `Vinculando Acesso: ${linkingCouncilman.name}` : 'Novo Login Legislativo'}
+                </h3>
+                <p className="text-[10px] font-bold text-purple-400 uppercase tracking-widest mt-1">Definition de credenciais de acesso</p>
               </div>
               <button onClick={() => setIsAccountModalOpen(false)} className="w-12 h-12 flex items-center justify-center text-purple-300 hover:text-purple-600 transition-all rounded-2xl hover:bg-white">
                 <i className="fa-solid fa-xmark text-xl"></i>
@@ -406,9 +429,9 @@ const ModerationTab: React.FC<ModerationTabProps> = ({
               </div>
 
               <div className="pt-6 flex gap-4">
-                <button type="button" onClick={() => setIsAccountModalOpen(false)} className="flex-1 py-4 text-[11px] font-black uppercase tracking-widest text-slate-400 hover:text-slate-600 transition-all">Descartar</button>
+                <button type="button" onClick={() => { setIsAccountModalOpen(false); setLinkingCouncilman(null); }} className="flex-1 py-4 text-[11px] font-black uppercase tracking-widest text-slate-400 hover:text-slate-600 transition-all">Descartar</button>
                 <button type="submit" className="flex-[2] py-4 bg-purple-600 hover:bg-purple-700 text-white font-black text-[11px] uppercase tracking-[0.2em] rounded-2xl shadow-xl shadow-purple-500/20 transition-all">
-                  Habilitar Acesso
+                  {linkingCouncilman ? 'Vincular e Habilitar' : 'Habilitar Acesso'}
                 </button>
               </div>
             </form>
