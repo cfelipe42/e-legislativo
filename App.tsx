@@ -26,6 +26,7 @@ const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState('dashboard');
   // Ensure we have activeBillId sync
   const [activeBillId, setActiveBillId] = useState<string | null>(null);
+  const [currentCouncilmanId, setCurrentCouncilmanId] = useState<string | undefined>(undefined);
 
   // Initialize with empty arrays meant to be populated from DB
   const [councilmen, setCouncilmen] = useState<Councilman[]>([]);
@@ -45,6 +46,16 @@ const App: React.FC = () => {
         setIsAuthenticated(true);
         setUserRole(session.user.user_metadata.role || 'clerk');
         setUserCity(session.user.user_metadata.city || 'Almenara');
+
+        // Resolve Councilman ID from Email/CPF
+        const email = session.user.email || '';
+        const cpf = email.split('@')[0];
+        if (cpf) {
+          supabase.from('users').select('councilman_id').eq('cpf', cpf).single()
+            .then(({ data }) => {
+              if (data?.councilman_id) setCurrentCouncilmanId(data.councilman_id);
+            });
+        }
       }
     });
 
@@ -54,8 +65,19 @@ const App: React.FC = () => {
         setIsAuthenticated(true);
         setUserRole(session.user.user_metadata.role || 'clerk');
         setUserCity(session.user.user_metadata.city || 'Almenara');
+
+        // Resolve Councilman ID from Email/CPF
+        const email = session.user.email || '';
+        const cpf = email.split('@')[0];
+        if (cpf) {
+          supabase.from('users').select('councilman_id').eq('cpf', cpf).single()
+            .then(({ data }) => {
+              if (data?.councilman_id) setCurrentCouncilmanId(data.councilman_id);
+            });
+        }
       } else {
         setIsAuthenticated(false);
+        setCurrentCouncilmanId(undefined);
       }
     });
 
@@ -65,7 +87,7 @@ const App: React.FC = () => {
   // Fetch initial data and setup subscriptions
   useEffect(() => {
     if (!isAuthenticated) return;
-
+    // ... existing fetching logic ...
     // 1. Fetch Chamber Configs
     const fetchConfigs = async () => {
       const { data } = await supabase.from('chamber_configs').select('*');
@@ -86,7 +108,7 @@ const App: React.FC = () => {
   // Realtime Subscriptions
   useEffect(() => {
     if (!isAuthenticated || !userCity) return;
-
+    // ... existing code ...
     // Listen to Chamber Config changes (Active Session)
     const configSub = supabase
       .channel('public:chamber_configs')
@@ -141,14 +163,11 @@ const App: React.FC = () => {
     setUserCity(city);
     setUserRole(role);
     setIsAuthenticated(true);
+    // No manual setActiveTab needed usually if auth effect handles it, but for smooth transition:
     if (role === 'councilman' || role === 'president') {
-      // Set presence in DB
-      if (role === 'councilman') {
-        const userCouncilman = councilmen.find(c => c.name === 'Carla Souza'); // TODO: Link real user
-        // We will implement real linking later, for now just update local state visually or if we had the ID
-      }
       setActiveTab('session');
     }
+    // Note: handleLogin is called by Login component but Auth listener also fires. 
   };
 
   const handleToggleFloorRequest = (id: string, status?: boolean) => {
@@ -203,9 +222,8 @@ const App: React.FC = () => {
           if (councilmanError) throw councilmanError;
         }
 
-        // 3. User metadata handles the link implicitly via email/auth id for now, 
-        // but 'councilmen' table doesn't have user_id column in my knowledge of schema from previous turns.
-        // The prompt asked to create the councilman "automatically".
+        // 3. Link explicitly in public.users if needed by current logic
+        // (Not strictly necessary for the newAccount flow unless we update it to populate users table too, but for now focusing on requested Manoel/Claudio flow)
 
         alert('Conta criada com sucesso!');
         setAccounts(prev => [...prev, newAccount]);
@@ -272,6 +290,7 @@ const App: React.FC = () => {
               userRole={userRole}
               activeSpeakerId={activeSpeakerId}
               speakingTimeElapsed={speakingTimeElapsed}
+              connectedCouncilmanId={currentCouncilmanId}
             />
           )}
           {activeTab === 'plenary' && <PlenaryDisplay city={userCity} activeBill={activeBill} councilmen={councilmen} onBack={() => setActiveTab('session')} sessionTitle="Sessão Ordinária" activeSpeakerId={activeSpeakerId} speakingTimeElapsed={speakingTimeElapsed} />}
