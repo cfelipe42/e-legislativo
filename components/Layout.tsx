@@ -6,9 +6,10 @@ interface LayoutProps {
   activeTab: string;
   setActiveTab: (tab: string) => void;
   userRole?: 'clerk' | 'councilman' | 'president' | 'moderator';
+  userName?: string;
 }
 
-const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab, userRole = 'clerk' }) => {
+const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab, userRole = 'clerk', userName }) => {
   const allTabs = [
     { id: 'dashboard', label: 'Painel Geral', icon: 'fa-chart-line', restricted: true },
     { id: 'session', label: 'Sessão Plenária', icon: 'fa-gavel', restricted: false },
@@ -97,10 +98,12 @@ const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab, user
             </div>
             <div className="overflow-hidden">
               <p className="text-sm font-black text-white truncate leading-none mb-1">
-                {isClerk ? 'Secretaria Geral' : isModerator ? 'Super Administrador' : isPresident ? 'Ver. Presidente' : 'Ver. Ana Silva'}
+                {userName || (isClerk ? 'Secretaria Geral' : 'Usuário')}
               </p>
               <p className="text-[10px] font-bold text-white/40 uppercase tracking-tighter">
-                {isClerk || isModerator ? 'Moderador' : 'Parlamentar'}
+                {userRole === 'president' ? 'Vereador Presidente' :
+                  userRole === 'councilman' ? 'Vereador(a)' :
+                    userRole === 'moderator' ? 'Administrador' : 'Mesário'}
               </p>
             </div>
           </div>

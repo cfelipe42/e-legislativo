@@ -23,6 +23,7 @@ const App: React.FC = () => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [userCity, setUserCity] = useState('');
   const [userRole, setUserRole] = useState<'clerk' | 'councilman' | 'president' | 'moderator'>('clerk');
+  const [userName, setUserName] = useState('');
   const [activeTab, setActiveTab] = useState('dashboard');
   // Ensure we have activeBillId sync
   const [activeBillId, setActiveBillId] = useState<string | null>(null);
@@ -46,6 +47,7 @@ const App: React.FC = () => {
         setIsAuthenticated(true);
         setUserRole(session.user.user_metadata.role || 'clerk');
         setUserCity(session.user.user_metadata.city || 'Almenara');
+        setUserName(session.user.user_metadata.name || 'Usuário');
 
         // Resolve Councilman ID from Email/CPF
         const email = session.user.email || '';
@@ -65,6 +67,7 @@ const App: React.FC = () => {
         setIsAuthenticated(true);
         setUserRole(session.user.user_metadata.role || 'clerk');
         setUserCity(session.user.user_metadata.city || 'Almenara');
+        setUserName(session.user.user_metadata.name || 'Usuário');
 
         // Resolve Councilman ID from Email/CPF
         const email = session.user.email || '';
@@ -294,7 +297,7 @@ const App: React.FC = () => {
       {!isAuthenticated ? (
         <Login onLogin={handleLogin} chamberConfigs={chamberConfigs} />
       ) : (
-        <Layout activeTab={activeTab} setActiveTab={setActiveTab} userRole={userRole}>
+        <Layout activeTab={activeTab} setActiveTab={setActiveTab} userRole={userRole} userName={userName}>
           <div className="mb-4">
             <span className="bg-slate-800 text-white text-[10px] px-3 py-1 rounded-full font-bold uppercase">
               Câmara de {userCity} | Perfil: {userRole}
