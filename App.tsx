@@ -251,7 +251,8 @@ const App: React.FC = () => {
     }
   };
 
-  const handleToggleFloorRequest = (id: string, status?: boolean) => {
+  const handleToggleFloorRequest = async (id: string, status?: boolean) => {
+    // Optimistic Update
     setCouncilmen(prev => prev.map(c => {
       if (c.id === id) {
         const newStatus = status !== undefined ? status : !c.isRequestingFloor;
@@ -260,10 +261,31 @@ const App: React.FC = () => {
       return c;
     }));
 
+    // Allow passing explicit status or toggling current based on local state (might be racey but ok for MVP)
+    const councilman = councilmen.find(c => c.id === id);
+    const newStatus = status !== undefined ? status : !councilman?.isRequestingFloor;
+    await supabase.from('councilmen').update({ isRequestingFloor: newStatus }).eq('id', id);
+
     if (status === false && activeSpeakerId === id) {
       setActiveSpeakerId(null);
       setSpeakingTimeElapsed(0);
+      await supabase.from('chamber_configs').update({ activeSpeakerId: null }).eq('city', userCity);
     }
+  };
+
+  const handleToggleInterventionRequest = async (id: string, status?: boolean) => {
+    // Optimistic
+    setCouncilmen(prev => prev.map(c => {
+      if (c.id === id) {
+        const newStatus = status !== undefined ? status : !c.isRequestingIntervention;
+        return { ...c, isRequestingIntervention: newStatus };
+      }
+      return c;
+    }));
+
+    const councilman = councilmen.find(c => c.id === id);
+    const newStatus = status !== undefined ? status : !councilman?.isRequestingIntervention;
+    await supabase.from('councilmen').update({ isRequestingIntervention: newStatus }).eq('id', id);
   };
 
   const handleAddCouncilman = (newCouncilman: Councilman) => {
@@ -324,6 +346,16 @@ const App: React.FC = () => {
     await supabase.from('councilmen').update({ currentVote: vote }).eq('id', councilmanId);
   };
 
+  const handleCreateBill = async (newBill: Bill) => {
+    const { error } = await supabase.from('bills').insert(newBill);
+    if (!error) {
+      setBills(prev => [...prev, newBill]);
+      alert('Projeto criado com sucesso!');
+    } else {
+      alert('Erro ao criar projeto: ' + error.message);
+    }
+  };
+
 
 
   const activeBill = bills.find(b => b.id === activeBillId) || null;
@@ -341,12 +373,13 @@ const App: React.FC = () => {
           </div>
 
           {activeTab === 'dashboard' && <Dashboard bills={bills} history={history} userRole={userRole} currentCouncilman={councilmen.find(c => c.id === currentCouncilmanId)} />}
-          {activeTab === 'bills' && <BillsList bills={bills} onStartVoting={handleStartVoting} onUpdateBill={(b) => setBills(prev => prev.map(old => old.id === b.id ? b : old))} userRole={userRole as any} />}
+          {activeTab === 'bills' && <BillsList bills={bills} onStartVoting={handleStartVoting} onCreateBill={handleCreateBill} onUpdateBill={(b) => setBills(prev => prev.map(old => old.id === b.id ? b : old))} userRole={userRole as any} />}
           {activeTab === 'session' && (
             <VotingSession
               bills={bills} councilmen={councilmen} activeBill={activeBill}
               onVote={handleVote}
               onToggleFloorRequest={handleToggleFloorRequest}
+              onToggleInterventionRequest={handleToggleInterventionRequest}
               onAuthorizeSpeech={(id) => { setActiveSpeakerId(id); setSpeakingTimeElapsed(0); }}
               onAddExtraTime={() => setSpeakingTimeElapsed(prev => Math.max(0, prev - 300))}
               onComplete={(stats) => {

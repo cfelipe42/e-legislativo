@@ -24,6 +24,7 @@ export interface Councilman {
   currentVote: VoteValue;
   avatar: string;
   isRequestingFloor?: boolean;
+  isRequestingIntervention?: boolean;
   isSpeaking?: boolean;
 }
 

@@ -6,6 +6,7 @@ interface BillsListProps {
   bills: Bill[];
   onStartVoting: (billId: string) => void;
   onUpdateBill: (updatedBill: Bill) => void;
+  onCreateBill?: (bill: Bill) => void;
   userRole: 'clerk' | 'councilman' | 'president' | 'moderator';
 }
 
@@ -17,6 +18,9 @@ const BillsList: React.FC<BillsListProps> = ({ bills, onStartVoting, onUpdateBil
   const [editingBill, setEditingBill] = useState<Bill | null>(null);
   const [attachingToBill, setAttachingToBill] = useState<Bill | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const [isCreating, setIsCreating] = useState(false);
+  const [newBillData, setNewBillData] = useState<Partial<Bill>>({ status: 'PENDING' });
 
   // Filtragem simples por termo de busca
   const filteredBills = bills.filter(bill =>
@@ -34,11 +38,20 @@ const BillsList: React.FC<BillsListProps> = ({ bills, onStartVoting, onUpdateBil
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
+  const statusMap = {
+    APPROVED: 'Aprovado',
+    REJECTED: 'Rejeitado',
+    VOTING: 'Em Votação',
+    PENDING: 'Aguardando',
+    DISCUSSION: 'Em Discussão'
+  };
+
   const getStatusBadge = (status: string) => {
     switch (status) {
       case 'APPROVED': return 'bg-emerald-100 text-emerald-700 border-emerald-200';
       case 'REJECTED': return 'bg-rose-100 text-rose-700 border-rose-200';
       case 'VOTING': return 'bg-blue-100 text-blue-700 border-blue-200 animate-pulse';
+      case 'DISCUSSION': return 'bg-amber-100 text-amber-700 border-amber-200';
       default: return 'bg-slate-100 text-slate-600 border-slate-200';
     }
   };
@@ -53,13 +66,30 @@ const BillsList: React.FC<BillsListProps> = ({ bills, onStartVoting, onUpdateBil
     }
   };
 
+  const handleCreate = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (newBillData.title && newBillData.author && onCreateBill) {
+      const newBill: Bill = {
+        id: `PL-${Date.now().toString().slice(-4)}/${new Date().getFullYear()}`,
+        title: newBillData.title,
+        description: newBillData.description || '',
+        author: newBillData.author,
+        category: newBillData.category || 'Geral',
+        status: 'PENDING',
+        fullText: newBillData.fullText || ''
+      };
+      onCreateBill(newBill);
+      setIsCreating(false);
+      setNewBillData({ status: 'PENDING' });
+    }
+  };
+
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file && attachingToBill) {
       const reader = new FileReader();
       reader.onload = (event) => {
         const text = event.target?.result as string;
-        // Simulando a extração do texto do arquivo para o campo fullText
         onUpdateBill({
           ...attachingToBill,
           fullText: text || "Texto extraído do documento em anexo.\n\n" + attachingToBill.fullText
@@ -73,6 +103,80 @@ const BillsList: React.FC<BillsListProps> = ({ bills, onStartVoting, onUpdateBil
 
   return (
     <div className="space-y-6 animate-fadeIn">
+      {/* Modal de Criação */}
+      {isCreating && (
+        <div className="fixed inset-0 z-[150] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-fadeIn">
+          <div className="bg-white w-full max-w-2xl rounded-3xl shadow-2xl overflow-hidden border border-slate-200 flex flex-col max-h-[90vh]">
+            <div className="p-6 border-b border-slate-100 bg-slate-50 flex items-center justify-between">
+              <div>
+                <h3 className="text-xl font-black text-slate-800 tracking-tight">Novo Projeto de Lei</h3>
+                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">Cadastro de nova proposição legislativa</p>
+              </div>
+              <button onClick={() => setIsCreating(false)} className="w-10 h-10 flex items-center justify-center text-slate-400 hover:text-rose-500 transition-all rounded-xl hover:bg-rose-50">
+                <i className="fa-solid fa-xmark text-lg"></i>
+              </button>
+            </div>
+
+            <form onSubmit={handleCreate} className="p-8 space-y-5 overflow-y-auto">
+              <div>
+                <label className="block text-[11px] font-black text-slate-500 uppercase tracking-widest mb-2">Título do Projeto</label>
+                <input
+                  type="text"
+                  value={newBillData.title || ''}
+                  onChange={(e) => setNewBillData({ ...newBillData, title: e.target.value })}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-bold text-slate-700 outline-none focus:ring-2 focus:ring-blue-500"
+                  required
+                  placeholder="Ex: Dispõe sobre..."
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-[11px] font-black text-slate-500 uppercase tracking-widest mb-2">Autor</label>
+                  <input
+                    type="text"
+                    value={newBillData.author || ''}
+                    onChange={(e) => setNewBillData({ ...newBillData, author: e.target.value })}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-bold text-slate-700 outline-none focus:ring-2 focus:ring-blue-500"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-[11px] font-black text-slate-500 uppercase tracking-widest mb-2">Categoria</label>
+                  <input
+                    type="text"
+                    value={newBillData.category || ''}
+                    onChange={(e) => setNewBillData({ ...newBillData, category: e.target.value })}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-bold text-slate-700 outline-none focus:ring-2 focus:ring-blue-500"
+                    required
+                    placeholder="Ex: Saúde, Educação..."
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-black text-slate-500 uppercase tracking-widest mb-2">Descrição Executiva</label>
+                <textarea
+                  value={newBillData.description || ''}
+                  onChange={(e) => setNewBillData({ ...newBillData, description: e.target.value })}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-bold text-slate-700 outline-none focus:ring-2 focus:ring-blue-500 min-h-[120px] resize-none"
+                  required
+                ></textarea>
+              </div>
+
+              <div className="pt-4 flex gap-3">
+                <button type="button" onClick={() => setIsCreating(false)} className="flex-1 py-4 text-[11px] font-black uppercase tracking-widest text-slate-400 hover:text-slate-600 transition-all border border-transparent hover:border-slate-100 rounded-xl">
+                  Cancelar
+                </button>
+                <button type="submit" className="flex-1 py-4 bg-blue-600 hover:bg-blue-500 text-white font-black text-[11px] uppercase tracking-widest rounded-xl shadow-lg shadow-blue-500/20 transition-all">
+                  Cadastrar Projeto
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
       {/* Modal de Edição de Projeto */}
       {editingBill && (
         <div className="fixed inset-0 z-[150] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-fadeIn">
@@ -194,15 +298,22 @@ const BillsList: React.FC<BillsListProps> = ({ bills, onStartVoting, onUpdateBil
           <h2 className="text-xl font-black text-slate-800 tracking-tight">Acervo Legislativo</h2>
           <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mt-1">Consulte e gerencie matérias em tramitação</p>
         </div>
-        <div className="relative w-full md:w-80">
-          <input
-            type="text"
-            placeholder="Buscar por ID, Título ou Autor..."
-            value={searchTerm}
-            onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }}
-            className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 pl-10 text-xs font-bold text-slate-700 outline-none focus:ring-2 focus:ring-blue-500 transition-all"
-          />
-          <i className="fa-solid fa-magnifying-glass absolute left-4 top-1/2 -translate-y-1/2 text-slate-300 text-xs"></i>
+        <div className="flex items-center gap-3">
+          {canManage && (
+            <button onClick={() => setIsCreating(true)} className="px-5 py-3 bg-slate-900 hover:bg-slate-800 text-white rounded-xl font-black text-xs uppercase tracking-widest shadow-lg shadow-slate-900/20 transition-all flex items-center gap-2">
+              <i className="fa-solid fa-plus"></i> Novo Projeto
+            </button>
+          )}
+          <div className="relative w-full md:w-80">
+            <input
+              type="text"
+              placeholder="Buscar por ID, Título ou Autor..."
+              value={searchTerm}
+              onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }}
+              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 pl-10 text-xs font-bold text-slate-700 outline-none focus:ring-2 focus:ring-blue-500 transition-all"
+            />
+            <i className="fa-solid fa-magnifying-glass absolute left-4 top-1/2 -translate-y-1/2 text-slate-300 text-xs"></i>
+          </div>
         </div>
       </div>
 
@@ -218,7 +329,7 @@ const BillsList: React.FC<BillsListProps> = ({ bills, onStartVoting, onUpdateBil
                       {bill.id}
                     </span>
                     <span className={`px-3 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest border ${getStatusBadge(bill.status)}`}>
-                      {bill.status === 'PENDING' ? 'Aguardando' : bill.status === 'APPROVED' ? 'Aprovado' : bill.status === 'REJECTED' ? 'Rejeitado' : 'Em Votação'}
+                      {statusMap[bill.status] || bill.status}
                     </span>
                     <span className="text-[10px] font-bold text-slate-400 uppercase bg-blue-50 px-2 py-1 rounded border border-blue-100">
                       {bill.category}
@@ -230,7 +341,7 @@ const BillsList: React.FC<BillsListProps> = ({ bills, onStartVoting, onUpdateBil
                   <div className="flex items-center gap-4 text-[11px] font-bold text-slate-400 uppercase tracking-tight">
                     <span className="flex items-center gap-1.5"><i className="fa-solid fa-user-pen text-blue-500/50"></i> {bill.author}</span>
                     <span className="w-1 h-1 bg-slate-200 rounded-full"></span>
-                    <span className="flex items-center gap-1.5"><i className="fa-solid fa-calendar text-slate-300"></i> Sessão 2025</span>
+                    <span className="flex items-center gap-1.5"><i className="fa-solid fa-calendar text-slate-300"></i> Sessão {new Date().getFullYear()}</span>
                   </div>
                 </div>
 
@@ -249,13 +360,13 @@ const BillsList: React.FC<BillsListProps> = ({ bills, onStartVoting, onUpdateBil
                         onClick={() => setEditingBill(bill)}
                         className="px-5 py-3 bg-slate-800 hover:bg-slate-700 text-white font-black text-[10px] uppercase tracking-widest rounded-xl transition-all border border-slate-900 shadow-lg shadow-slate-900/10 flex items-center gap-2"
                       >
-                        Editar Projeto <i className="fa-solid fa-pen-to-square"></i>
+                        <i className="fa-solid fa-pen-to-square"></i>
                       </button>
                       <button
                         onClick={() => setAttachingToBill(bill)}
                         className="px-5 py-3 bg-blue-600 hover:bg-blue-500 text-white font-black text-[10px] uppercase tracking-widest rounded-xl transition-all border border-blue-700 shadow-lg shadow-blue-900/10 flex items-center gap-2"
                       >
-                        Anexar Projeto <i className="fa-solid fa-paperclip"></i>
+                        <i className="fa-solid fa-paperclip"></i>
                       </button>
                     </>
                   )}
@@ -263,9 +374,10 @@ const BillsList: React.FC<BillsListProps> = ({ bills, onStartVoting, onUpdateBil
                   {canManage && (bill.status === 'PENDING' || bill.status === 'DISCUSSION') && (
                     <button
                       onClick={() => onStartVoting(bill.id)}
-                      className="px-5 py-3 bg-blue-600 hover:bg-blue-500 text-white font-black text-[10px] uppercase tracking-widest rounded-xl transition-all shadow-lg shadow-blue-500/20 flex items-center justify-center gap-2"
+                      className="px-5 py-3 bg-green-600 hover:bg-green-500 text-white font-black text-[10px] uppercase tracking-widest rounded-xl transition-all shadow-lg shadow-green-500/20 flex items-center justify-center gap-2"
+                      title="Clique para iniciar a votação deste projeto"
                     >
-                      Votar <i className="fa-solid fa-gavel"></i>
+                      Abrir Votação <i className="fa-solid fa-gavel"></i>
                     </button>
                   )}
                 </div>
