@@ -163,11 +163,14 @@ const App: React.FC = () => {
     setUserCity(city);
     setUserRole(role);
     setIsAuthenticated(true);
-    // No manual setActiveTab needed usually if auth effect handles it, but for smooth transition:
+    // Auto-redirect based on role
     if (role === 'councilman' || role === 'president') {
       setActiveTab('session');
+    } else if (role === 'moderator') {
+      setActiveTab('moderation');
+    } else {
+      setActiveTab('dashboard');
     }
-    // Note: handleLogin is called by Login component but Auth listener also fires. 
   };
 
   const handleToggleFloorRequest = (id: string, status?: boolean) => {

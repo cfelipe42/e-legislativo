@@ -88,10 +88,8 @@ const Login: React.FC<LoginProps> = ({ onLogin, chamberConfigs }) => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!city) {
-      alert('Selecione a Câmara Municipal que deseja gerenciar.');
-      return;
-    }
+    // Modificação: Não obrigar seleção de cidade para LOGIN (apenas para cadastro)
+    // if (!city) { ... } <- Removido
 
     let emailPrefix = cpf.replace(/\D/g, '');
     if (emailPrefix.length === 0) {
@@ -108,6 +106,12 @@ const Login: React.FC<LoginProps> = ({ onLogin, chamberConfigs }) => {
 
     if (signInError) {
       if (signInError.message === 'Invalid login credentials') {
+        // Para criar conta, AÍ SIM precisamos da cidade e role
+        if (!city) {
+          alert('Usuário não encontrado. Para criar um novo cadastro, selecione a Câmara e a Função desejada antes de fazer login.');
+          return;
+        }
+
         // Se falhar e for o primeiro acesso, vamos tentar criar a conta (para facilitar testes)
         // Em produção isso seria um fluxo de SignUp separado.
         const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
@@ -138,9 +142,15 @@ const Login: React.FC<LoginProps> = ({ onLogin, chamberConfigs }) => {
     }
 
     if (signInData.user) {
+      const userMeta = signInData.user.user_metadata;
+
+      // Override manual selection if user has defined profile
+      const finalCity = userMeta.city || city;
+      const finalRole = userMeta.role || activeRole;
+
       // Validar IP se não for moderador
-      if (activeRole !== 'moderator') {
-        const currentConfig = chamberConfigs.find(c => c.city === city);
+      if (finalRole !== 'moderator') {
+        const currentConfig = chamberConfigs.find(c => c.city === finalCity);
         const allowedIP = currentConfig?.allowedIP || '';
         const isTestMode = allowedIP === '127.0.0.1' || allowedIP === 'localhost' || !allowedIP;
         const matchesDetected = userIP && userIP === allowedIP;
@@ -152,7 +162,7 @@ const Login: React.FC<LoginProps> = ({ onLogin, chamberConfigs }) => {
         }
       }
 
-      onLogin(city, activeRole);
+      onLogin(finalCity, finalRole);
     }
   };
 
