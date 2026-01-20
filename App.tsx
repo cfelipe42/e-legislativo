@@ -7,6 +7,7 @@ import PlenaryDisplay from './components/PlenaryDisplay';
 import BillsList from './components/BillsList';
 import CouncilmenManagement from './components/CouncilmenManagement';
 import ModerationTab from './components/ModerationTab';
+import History from './components/History';
 import Login from './components/Login';
 import { Councilman, Bill, SessionHistory, VoteValue, UserAccount, ChamberConfig } from './types';
 import { INITIAL_COUNCILMEN, INITIAL_BILLS } from './constants';
@@ -304,7 +305,7 @@ const App: React.FC = () => {
             </span>
           </div>
 
-          {activeTab === 'dashboard' && <Dashboard bills={bills} history={history} userRole={userRole} />}
+          {activeTab === 'dashboard' && <Dashboard bills={bills} history={history} userRole={userRole} currentCouncilman={councilmen.find(c => c.id === currentCouncilmanId)} />}
           {activeTab === 'bills' && <BillsList bills={bills} onStartVoting={handleStartVoting} onUpdateBill={(b) => setBills(prev => prev.map(old => old.id === b.id ? b : old))} userRole={userRole as any} />}
           {activeTab === 'session' && (
             <VotingSession
@@ -341,8 +342,18 @@ const App: React.FC = () => {
               connectedCouncilmanId={currentCouncilmanId}
             />
           )}
+          {activeTab === 'history' && <History history={history} />}
           {activeTab === 'plenary' && <PlenaryDisplay city={userCity} activeBill={activeBill} councilmen={councilmen} onBack={() => setActiveTab('session')} sessionTitle="Sessão Ordinária" activeSpeakerId={activeSpeakerId} speakingTimeElapsed={speakingTimeElapsed} />}
-          {activeTab === 'management' && <CouncilmenManagement councilmen={councilmen} onUpdateCouncilman={(u) => setCouncilmen(prev => prev.map(c => c.id === u.id ? u : c))} />}
+          {activeTab === 'management' && <CouncilmenManagement councilmen={councilmen} onUpdateCouncilman={async (u) => {
+            // Optimistic update
+            setCouncilmen(prev => prev.map(c => c.id === u.id ? u : c));
+            // Actual DB Update
+            await supabase.from('councilmen').update({
+              name: u.name,
+              party: u.party,
+              avatar: u.avatar
+            }).eq('id', u.id);
+          }} />}
           {activeTab === 'moderation' && userRole === 'moderator' && (
             <ModerationTab
               chamberConfigs={chamberConfigs}
