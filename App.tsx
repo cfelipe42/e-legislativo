@@ -95,7 +95,15 @@ const App: React.FC = () => {
     // 1. Fetch Chamber Configs
     const fetchConfigs = async () => {
       const { data } = await supabase.from('chamber_configs').select('*');
-      if (data && data.length > 0) setChamberConfigs(data as any);
+      if (data && data.length > 0) {
+        const mapped = data.map((c: any) => ({
+          ...c,
+          activeBillId: c.active_bill_id,
+          activeSpeakerId: c.active_speaker_id,
+          isVotingOpen: c.is_voting_open
+        }));
+        setChamberConfigs(mapped);
+      }
     };
 
     // 2. Fetch Councilmen
@@ -117,7 +125,13 @@ const App: React.FC = () => {
     const configSub = supabase
       .channel('public:chamber_configs')
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'chamber_configs', filter: `city=eq.${userCity}` }, payload => {
-        const newConfig = payload.new as ChamberConfig;
+        const raw = payload.new;
+        const newConfig: ChamberConfig = {
+          ...raw as any,
+          activeBillId: raw.active_bill_id,
+          activeSpeakerId: raw.active_speaker_id,
+          isVotingOpen: raw.is_voting_open
+        };
         setChamberConfigs(prev => prev.map(c => c.city === newConfig.city ? newConfig : c));
         setActiveBillId(newConfig.activeBillId || null);
         setActiveSpeakerId(newConfig.activeSpeakerId || null);
@@ -339,7 +353,16 @@ const App: React.FC = () => {
   const handleStartVoting = async (billId: string) => {
     setActiveBillId(billId);
     setActiveTab('session');
-    await supabase.from('chamber_configs').update({ activeBillId: billId }).eq('city', userCity);
+    // Start in DISCUSSION phase (is_voting_open = false)
+    await supabase.from('chamber_configs').update({
+      active_bill_id: billId,
+      is_voting_open: false,
+      active_speaker_id: null
+    }).eq('city', userCity);
+  };
+
+  const handleOpenVoting = async () => {
+    await supabase.from('chamber_configs').update({ is_voting_open: true }).eq('city', userCity);
   };
 
   const handleVote = async (councilmanId: string, vote: VoteValue) => {
@@ -375,6 +398,7 @@ const App: React.FC = () => {
           {activeTab === 'dashboard' && <Dashboard bills={bills} history={history} userRole={userRole} currentCouncilman={councilmen.find(c => c.id === currentCouncilmanId)} />}
           {activeTab === 'bills' && <BillsList bills={bills} onStartVoting={handleStartVoting} onCreateBill={handleCreateBill} onUpdateBill={(b) => setBills(prev => prev.map(old => old.id === b.id ? b : old))} userRole={userRole as any} />}
           {activeTab === 'session' && (
+
             <VotingSession
               bills={bills} councilmen={councilmen} activeBill={activeBill}
               onVote={handleVote}
@@ -382,6 +406,11 @@ const App: React.FC = () => {
               onToggleInterventionRequest={handleToggleInterventionRequest}
               onAuthorizeSpeech={(id) => { setActiveSpeakerId(id); setSpeakingTimeElapsed(0); }}
               onAddExtraTime={() => setSpeakingTimeElapsed(prev => Math.max(0, prev - 300))}
+
+              // New Props for Voting Phase
+              isVotingOpen={chamberConfigs.find(c => c.city === userCity)?.isVotingOpen || false}
+              onOpenVoting={handleOpenVoting}
+
               onComplete={(stats) => {
                 const newH: SessionHistory = {
                   id: `S-${Date.now()}`, billId: activeBillId!, date: new Date().toLocaleDateString(),
@@ -404,7 +433,7 @@ const App: React.FC = () => {
                 }).then();
 
                 // Clear active session in DB
-                supabase.from('chamber_configs').update({ activeBillId: null, activeSpeakerId: null }).eq('city', userCity).then();
+                supabase.from('chamber_configs').update({ active_bill_id: null, active_speaker_id: null, is_voting_open: false }).eq('city', userCity).then();
                 // Reset votes in DB
                 councilmen.forEach(c => {
                   supabase.from('councilmen').update({ currentVote: 'PENDING', isRequestingFloor: false }).eq('id', c.id).then();

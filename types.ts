@@ -13,6 +13,7 @@ export interface ChamberConfig {
   lastSessionDate?: string;
   activeBillId?: string | null;
   activeSpeakerId?: string | null;
+  isVotingOpen?: boolean;
 }
 
 export interface Councilman {

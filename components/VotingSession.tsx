@@ -16,6 +16,8 @@ interface VotingSessionProps {
   speakingTimeElapsed?: number;
   speakingTimeLimit?: number;
   connectedCouncilmanId?: string;
+  isVotingOpen?: boolean;
+  onOpenVoting?: () => void;
 }
 
 const VotingSession: React.FC<VotingSessionProps> = ({
@@ -30,7 +32,9 @@ const VotingSession: React.FC<VotingSessionProps> = ({
   activeSpeakerId,
   speakingTimeElapsed = 0,
   speakingTimeLimit = 600,
-  connectedCouncilmanId
+  connectedCouncilmanId,
+  isVotingOpen = false,
+  onOpenVoting
 }) => {
   const [showRequestToast, setShowRequestToast] = useState(false);
   const [isProcessingRequest, setIsProcessingRequest] = useState(false);
@@ -237,12 +241,21 @@ const VotingSession: React.FC<VotingSessionProps> = ({
 
             {hasClerkPowers && activeBill && (
               <div className="flex flex-col gap-3 relative z-10">
-                <button
-                  onClick={() => onComplete(voteStats)}
-                  className="px-8 py-3 bg-blue-600 hover:bg-blue-500 text-white font-black text-xs uppercase rounded-2xl shadow-xl transition-all flex items-center gap-2 border border-blue-400/30"
-                >
-                  Encerrar Votação <i className="fa-solid fa-gavel"></i>
-                </button>
+                {!isVotingOpen ? (
+                  <button
+                    onClick={onOpenVoting}
+                    className="px-8 py-3 bg-green-600 hover:bg-green-500 text-white font-black text-xs uppercase rounded-2xl shadow-xl transition-all flex items-center gap-2 border border-green-400/30 animate-pulse"
+                  >
+                    Iniciar Votação <i className="fa-solid fa-play"></i>
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => onComplete(voteStats)}
+                    className="px-8 py-3 bg-blue-600 hover:bg-blue-500 text-white font-black text-xs uppercase rounded-2xl shadow-xl transition-all flex items-center gap-2 border border-blue-400/30"
+                  >
+                    Encerrar Votação <i className="fa-solid fa-gavel"></i>
+                  </button>
+                )}
               </div>
             )}
           </div>
@@ -260,17 +273,27 @@ const VotingSession: React.FC<VotingSessionProps> = ({
                 <p className="mt-4 text-slate-500 text-sm leading-relaxed">{activeBill.description}</p>
               </div>
 
-              {hasCouncilPowers && (
-                <div className="mt-8 pt-8 border-t border-slate-100 grid grid-cols-1 sm:grid-cols-3 gap-4">
-                  <button onClick={() => handleVoteWithFeedback(VoteValue.YES)} className={`py-6 rounded-2xl font-black text-sm transition-all border-b-4 ${myData?.currentVote === VoteValue.YES ? 'bg-emerald-600 border-emerald-800 text-white scale-105 shadow-xl' : 'bg-slate-50 border-slate-200 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50'}`}>
-                    <i className="fa-solid fa-check-circle text-xl mb-2 block"></i> VOTAR SIM
-                  </button>
-                  <button onClick={() => handleVoteWithFeedback(VoteValue.NO)} className={`py-6 rounded-2xl font-black text-sm transition-all border-b-4 ${myData?.currentVote === VoteValue.NO ? 'bg-rose-600 border-rose-800 text-white scale-105 shadow-xl' : 'bg-slate-50 border-slate-200 text-slate-400 hover:text-rose-600 hover:bg-rose-50'}`}>
-                    <i className="fa-solid fa-times-circle text-xl mb-2 block"></i> VOTAR NÃO
-                  </button>
-                  <button onClick={() => handleVoteWithFeedback(VoteValue.ABSTAIN)} className={`py-6 rounded-2xl font-black text-sm transition-all border-b-4 ${myData?.currentVote === VoteValue.ABSTAIN ? 'bg-slate-800 border-slate-900 text-white scale-105 shadow-xl' : 'bg-slate-50 border-slate-200 text-slate-400 hover:text-slate-800 hover:bg-slate-100'}`}>
-                    <i className="fa-solid fa-minus-circle text-xl mb-2 block"></i> ABSTER-SE
-                  </button>
+              {/* Voting Controls (Only visible when voting is open) */}
+              {isVotingOpen ? (
+                hasCouncilPowers && (
+                  <div className="mt-8 pt-8 border-t border-slate-100 grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <button onClick={() => handleVoteWithFeedback(VoteValue.YES)} className={`py-6 rounded-2xl font-black text-sm transition-all border-b-4 ${myData?.currentVote === VoteValue.YES ? 'bg-emerald-600 border-emerald-800 text-white scale-105 shadow-xl' : 'bg-slate-50 border-slate-200 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50'}`}>
+                      <i className="fa-solid fa-check-circle text-xl mb-2 block"></i> VOTAR SIM
+                    </button>
+                    <button onClick={() => handleVoteWithFeedback(VoteValue.NO)} className={`py-6 rounded-2xl font-black text-sm transition-all border-b-4 ${myData?.currentVote === VoteValue.NO ? 'bg-rose-600 border-rose-800 text-white scale-105 shadow-xl' : 'bg-slate-50 border-slate-200 text-slate-400 hover:text-rose-600 hover:bg-rose-50'}`}>
+                      <i className="fa-solid fa-times-circle text-xl mb-2 block"></i> VOTAR NÃO
+                    </button>
+                    <button onClick={() => handleVoteWithFeedback(VoteValue.ABSTAIN)} className={`py-6 rounded-2xl font-black text-sm transition-all border-b-4 ${myData?.currentVote === VoteValue.ABSTAIN ? 'bg-slate-800 border-slate-900 text-white scale-105 shadow-xl' : 'bg-slate-50 border-slate-200 text-slate-400 hover:text-slate-800 hover:bg-slate-100'}`}>
+                      <i className="fa-solid fa-minus-circle text-xl mb-2 block"></i> ABSTER-SE
+                    </button>
+                  </div>
+                )
+              ) : (
+                <div className="mt-8 pt-8 border-t border-slate-100 text-center">
+                  <div className="inline-block px-6 py-2 bg-amber-100 text-amber-700 rounded-full font-black text-xs uppercase tracking-widest border border-amber-200">
+                    <i className="fa-solid fa-comments mr-2"></i> Em Discussão
+                  </div>
+                  <p className="mt-4 text-slate-400 text-[10px] font-bold uppercase tracking-widest">Aguarde o início da votação</p>
                 </div>
               )}
             </div>
