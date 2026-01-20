@@ -142,10 +142,49 @@ const App: React.FC = () => {
   useEffect(() => {
     const currentConfig = chamberConfigs.find(c => c.city === userCity);
     if (currentConfig) {
-      setActiveBillId(currentConfig.activeBillId || null);
+      const newActiveBillId = currentConfig.activeBillId || null;
+
+      // Auto-navigate to session if a new bill is activated and we are not already there
+      if (newActiveBillId && newActiveBillId !== activeBillId) {
+        setActiveTab('session');
+      }
+
+      setActiveBillId(newActiveBillId);
       setActiveSpeakerId(currentConfig.activeSpeakerId || null);
     }
   }, [chamberConfigs, userCity]);
+
+  // Fetch and Subscribe to Bills
+  useEffect(() => {
+    if (!isAuthenticated || !userCity) return;
+
+    const fetchBills = async () => {
+      const { data, error } = await supabase.from('bills').select('*');
+      if (!error && data && data.length > 0) {
+        // Transformar dados se necessário ou garantir que correspondem a Bill[]
+        // O tipo Bill da aplicação deve bater com o banco. 
+        // Assumindo mapeamento direto por enquanto.
+        setBills(data as any);
+      }
+    };
+
+    fetchBills();
+
+    const billsSub = supabase
+      .channel('public:bills')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'bills' }, payload => {
+        if (payload.eventType === 'UPDATE') {
+          setBills(prev => prev.map(b => b.id === payload.new.id ? payload.new as Bill : b));
+        } else if (payload.eventType === 'INSERT') {
+          setBills(prev => [...prev, payload.new as Bill]);
+        }
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(billsSub);
+    };
+  }, [isAuthenticated, userCity]);
 
   useEffect(() => {
     if (activeSpeakerId) {
@@ -279,6 +318,9 @@ const App: React.FC = () => {
                 };
                 setHistory(prev => [newH, ...prev]);
                 setBills(prev => prev.map(b => b.id === activeBillId ? { ...b, status: newH.result.outcome } : b));
+
+                // UPDATE SUPABASE: Save Bill Status
+                supabase.from('bills').update({ status: newH.result.outcome }).eq('id', activeBillId).then();
 
                 // Clear active session in DB
                 supabase.from('chamber_configs').update({ activeBillId: null, activeSpeakerId: null }).eq('city', userCity).then();
