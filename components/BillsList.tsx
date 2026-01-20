@@ -260,7 +260,7 @@ const BillsList: React.FC<BillsListProps> = ({ bills, onStartVoting, onUpdateBil
                     </>
                   )}
 
-                  {canManage && bill.status === 'PENDING' && (
+                  {canManage && (bill.status === 'PENDING' || bill.status === 'DISCUSSION') && (
                     <button
                       onClick={() => onStartVoting(bill.id)}
                       className="px-5 py-3 bg-blue-600 hover:bg-blue-500 text-white font-black text-[10px] uppercase tracking-widest rounded-xl transition-all shadow-lg shadow-blue-500/20 flex items-center justify-center gap-2"
@@ -296,8 +296,8 @@ const BillsList: React.FC<BillsListProps> = ({ bills, onStartVoting, onUpdateBil
               key={i}
               onClick={() => handlePageChange(i + 1)}
               className={`w-10 h-10 flex items-center justify-center rounded-xl text-xs font-black transition-all shadow-sm ${currentPage === i + 1
-                  ? 'bg-blue-600 text-white border border-blue-500'
-                  : 'bg-white text-slate-500 border border-slate-200 hover:border-blue-300 hover:text-blue-600'
+                ? 'bg-blue-600 text-white border border-blue-500'
+                : 'bg-white text-slate-500 border border-slate-200 hover:border-blue-300 hover:text-blue-600'
                 }`}
             >
               {i + 1}
