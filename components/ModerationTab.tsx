@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { ChamberConfig, Councilman, VoteValue, UserAccount } from '../types';
 
@@ -42,13 +41,14 @@ const ModerationTab: React.FC<ModerationTabProps> = ({
 
   // Estados para Gestão de Contas
   const [isAccountModalOpen, setIsAccountModalOpen] = useState(false);
-  const [formAccount, setFormAccount] = useState<Partial<UserAccount>>({
+  const [formAccount, setFormAccount] = useState<Partial<UserAccount> & { party?: string }>({
     name: '',
     cpf: '',
     password: '',
     role: 'councilman',
     city: currentCity,
-    allowedIP: ''
+    allowedIP: '',
+    party: ''
   });
 
   const handleStartEditIP = (config: ChamberConfig) => {
@@ -101,7 +101,7 @@ const ModerationTab: React.FC<ModerationTabProps> = ({
     };
     onAddAccount(newAcc);
     setIsAccountModalOpen(false);
-    setFormAccount({ name: '', cpf: '', password: '', role: 'councilman', city: currentCity, allowedIP: '' });
+    setFormAccount({ name: '', cpf: '', password: '', role: 'councilman', city: currentCity, allowedIP: '', party: '' });
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -207,8 +207,8 @@ const ModerationTab: React.FC<ModerationTabProps> = ({
                   onClick={() => onSwitchCity(config.city)}
                   disabled={currentCity === config.city}
                   className={`w-full py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${currentCity === config.city
-                      ? 'bg-slate-100 text-slate-400 cursor-not-allowed'
-                      : 'bg-purple-100 text-purple-700 hover:bg-purple-200 shadow-sm'
+                    ? 'bg-slate-100 text-slate-400 cursor-not-allowed'
+                    : 'bg-purple-100 text-purple-700 hover:bg-purple-200 shadow-sm'
                     }`}
                 >
                   {currentCity === config.city ? 'Monitorando Esta Câmara' : 'Gerenciar Instância'}
@@ -392,6 +392,17 @@ const ModerationTab: React.FC<ModerationTabProps> = ({
                     ))}
                   </div>
                 </div>
+
+                {formAccount.role === 'councilman' && (
+                  <div className="col-span-2 animate-fadeIn">
+                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-2">Legenda Partidária</label>
+                    <input
+                      type="text" value={formAccount.party || ''} onChange={(e) => setFormAccount({ ...formAccount, party: e.target.value })}
+                      className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-5 py-3.5 text-sm font-bold text-slate-700 outline-none focus:ring-4 focus:ring-purple-500/10 focus:border-purple-500 transition-all"
+                      placeholder="Ex: MDB" required
+                    />
+                  </div>
+                )}
               </div>
 
               <div className="pt-6 flex gap-4">

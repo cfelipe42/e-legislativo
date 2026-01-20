@@ -11,12 +11,15 @@ export interface ChamberConfig {
   allowedIP: string;
   isActive: boolean;
   lastSessionDate?: string;
+  activeBillId?: string | null;
+  activeSpeakerId?: string | null;
 }
 
 export interface Councilman {
   id: string;
   name: string;
   party: string;
+  city: string;
   isPresent: boolean;
   currentVote: VoteValue;
   avatar: string;
