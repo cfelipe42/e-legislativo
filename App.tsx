@@ -54,9 +54,12 @@ const App: React.FC = () => {
         const email = session.user.email || '';
         const cpf = email.split('@')[0];
         if (cpf) {
-          supabase.from('users').select('councilman_id').eq('cpf', cpf).single()
+          supabase.from('users').select('councilman_id, role').eq('cpf', cpf).single()
             .then(({ data }) => {
-              if (data?.councilman_id) setCurrentCouncilmanId(data.councilman_id);
+              if (data) {
+                if (data.councilman_id) setCurrentCouncilmanId(data.councilman_id);
+                if (data.role) setUserRole(data.role as 'clerk' | 'councilman' | 'president' | 'moderator');
+              }
             });
         }
       }
@@ -74,9 +77,12 @@ const App: React.FC = () => {
         const email = session.user.email || '';
         const cpf = email.split('@')[0];
         if (cpf) {
-          supabase.from('users').select('councilman_id').eq('cpf', cpf).single()
+          supabase.from('users').select('councilman_id, role').eq('cpf', cpf).single()
             .then(({ data }) => {
-              if (data?.councilman_id) setCurrentCouncilmanId(data.councilman_id);
+              if (data) {
+                if (data.councilman_id) setCurrentCouncilmanId(data.councilman_id);
+                if (data.role) setUserRole(data.role as 'clerk' | 'councilman' | 'president' | 'moderator');
+              }
             });
         }
       } else {
@@ -426,6 +432,7 @@ const App: React.FC = () => {
               onAddExtraTime={() => setSpeakingTimeElapsed(prev => Math.max(0, prev - 300))}
 
               // New Props for Voting Phase
+              connectedCouncilmanId={currentCouncilmanId}
               isVotingOpen={chamberConfigs.find(c => c.city === userCity)?.isVotingOpen || false}
               onOpenVoting={handleOpenVoting}
               onOpenTransmission={handleOpenTransmission}
@@ -464,7 +471,6 @@ const App: React.FC = () => {
               userRole={userRole}
               activeSpeakerId={activeSpeakerId}
               speakingTimeElapsed={speakingTimeElapsed}
-              connectedCouncilmanId={currentCouncilmanId}
             />
           )}
           {activeTab === 'history' && <History history={history} />}
