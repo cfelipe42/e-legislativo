@@ -42,49 +42,38 @@ const App: React.FC = () => {
   const timerRef = useRef<number | null>(null);
 
   useEffect(() => {
+    // Helper to resolve user context
+    const resolveUserContext = (session: any) => {
+      if (!session) return;
+
+      setIsAuthenticated(true);
+      setUserRole(session.user.user_metadata.role || 'clerk');
+      setUserCity(session.user.user_metadata.city || 'Almenara');
+      setUserName(session.user.user_metadata.name || 'Usuário');
+
+      // Resolve Councilman ID from Email/CPF
+      const email = session.user.email || '';
+      const cpf = email.split('@')[0];
+      if (cpf) {
+        supabase.from('users').select('councilman_id, role').eq('cpf', cpf).single()
+          .then(({ data }) => {
+            if (data) {
+              if (data.councilman_id) setCurrentCouncilmanId(data.councilman_id);
+              if (data.role) setUserRole(data.role as 'clerk' | 'councilman' | 'president' | 'moderator');
+            }
+          });
+      }
+    };
+
     // Check initial session
     supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session) {
-        setIsAuthenticated(true);
-        setUserRole(session.user.user_metadata.role || 'clerk');
-        setUserCity(session.user.user_metadata.city || 'Almenara');
-        setUserName(session.user.user_metadata.name || 'Usuário');
-
-        // Resolve Councilman ID from Email/CPF
-        const email = session.user.email || '';
-        const cpf = email.split('@')[0];
-        if (cpf) {
-          supabase.from('users').select('councilman_id, role').eq('cpf', cpf).single()
-            .then(({ data }) => {
-              if (data) {
-                if (data.councilman_id) setCurrentCouncilmanId(data.councilman_id);
-                if (data.role) setUserRole(data.role as 'clerk' | 'councilman' | 'president' | 'moderator');
-              }
-            });
-        }
-      }
+      if (session) resolveUserContext(session);
     });
 
     // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       if (session) {
-        setIsAuthenticated(true);
-        setUserRole(session.user.user_metadata.role || 'clerk');
-        setUserCity(session.user.user_metadata.city || 'Almenara');
-        setUserName(session.user.user_metadata.name || 'Usuário');
-
-        // Resolve Councilman ID from Email/CPF
-        const email = session.user.email || '';
-        const cpf = email.split('@')[0];
-        if (cpf) {
-          supabase.from('users').select('councilman_id, role').eq('cpf', cpf).single()
-            .then(({ data }) => {
-              if (data) {
-                if (data.councilman_id) setCurrentCouncilmanId(data.councilman_id);
-                if (data.role) setUserRole(data.role as 'clerk' | 'councilman' | 'president' | 'moderator');
-              }
-            });
-        }
+        resolveUserContext(session);
       } else {
         setIsAuthenticated(false);
         setCurrentCouncilmanId(undefined);
