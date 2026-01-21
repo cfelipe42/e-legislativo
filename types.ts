@@ -52,6 +52,7 @@ export interface Bill {
   description: string;
   author: string;
   category: string;
+  type: 'PL' | 'INDICATION';
   status: 'PENDING' | 'VOTING' | 'APPROVED' | 'REJECTED';
   fullText: string;
 }

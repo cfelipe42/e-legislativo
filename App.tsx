@@ -241,15 +241,33 @@ const App: React.FC = () => {
 
   useEffect(() => {
     if (activeSpeakerId) {
-      timerRef.current = window.setInterval(() => setSpeakingTimeElapsed(v => v + 1), 1000);
+      timerRef.current = window.setInterval(() => {
+        setSpeakingTimeElapsed(v => {
+          if (v >= 600) {
+            return 600; // Hard stop at 10 minutes
+          }
+          // Warning sound at 9 mins (540s) handled in VotingSession per visual feedback loop
+          return v + 1;
+        });
+      }, 1000);
     } else {
       if (timerRef.current) {
         clearInterval(timerRef.current);
         timerRef.current = null;
       }
     }
-    return () => { if (timerRef.current) clearInterval(timerRef.current); };
+    return () => {
+      if (timerRef.current) clearInterval(timerRef.current);
+    };
   }, [activeSpeakerId]);
+
+  const handleOpenTransmission = () => {
+    // URL hardcoded for now or fetched from config?
+    // Using a placeholder that user can request to change later
+    const transmissionUrl = "https://www.youtube.com/live_dashboard";
+    window.open(transmissionUrl, '_blank', 'noopener,noreferrer');
+  };
+
 
   const handleLogin = (city: string, role: any) => {
     setUserCity(city);
@@ -410,6 +428,7 @@ const App: React.FC = () => {
               // New Props for Voting Phase
               isVotingOpen={chamberConfigs.find(c => c.city === userCity)?.isVotingOpen || false}
               onOpenVoting={handleOpenVoting}
+              onOpenTransmission={handleOpenTransmission}
 
               onComplete={(stats) => {
                 const newH: SessionHistory = {

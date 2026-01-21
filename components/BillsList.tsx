@@ -20,7 +20,7 @@ const BillsList: React.FC<BillsListProps> = ({ bills, onStartVoting, onUpdateBil
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [isCreating, setIsCreating] = useState(false);
-  const [newBillData, setNewBillData] = useState<Partial<Bill>>({ status: 'PENDING' });
+  const [newBillData, setNewBillData] = useState<Partial<Bill>>({ status: 'PENDING', type: 'PL' });
 
   // Filtragem simples por termo de busca
   const filteredBills = bills.filter(bill =>
@@ -44,6 +44,11 @@ const BillsList: React.FC<BillsListProps> = ({ bills, onStartVoting, onUpdateBil
     VOTING: 'Em Votação',
     PENDING: 'Aguardando',
     DISCUSSION: 'Em Discussão'
+  };
+
+  const typeMap = {
+    PL: 'Projeto de Lei',
+    INDICATION: 'Indicação'
   };
 
   const getStatusBadge = (status: string) => {
@@ -75,6 +80,7 @@ const BillsList: React.FC<BillsListProps> = ({ bills, onStartVoting, onUpdateBil
         description: newBillData.description || '',
         author: newBillData.author,
         category: newBillData.category || 'Geral',
+        type: newBillData.type || 'PL',
         status: 'PENDING',
         fullText: newBillData.fullText || ''
       };
@@ -142,16 +148,28 @@ const BillsList: React.FC<BillsListProps> = ({ bills, onStartVoting, onUpdateBil
                   />
                 </div>
                 <div>
-                  <label className="block text-[11px] font-black text-slate-500 uppercase tracking-widest mb-2">Categoria</label>
-                  <input
-                    type="text"
-                    value={newBillData.category || ''}
-                    onChange={(e) => setNewBillData({ ...newBillData, category: e.target.value })}
+                  <label className="block text-[11px] font-black text-slate-500 uppercase tracking-widest mb-2">Tipo</label>
+                  <select
+                    value={newBillData.type || 'PL'}
+                    onChange={(e) => setNewBillData({ ...newBillData, type: e.target.value as any })}
                     className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-bold text-slate-700 outline-none focus:ring-2 focus:ring-blue-500"
-                    required
-                    placeholder="Ex: Saúde, Educação..."
-                  />
+                  >
+                    <option value="PL">Projeto de Lei</option>
+                    <option value="INDICATION">Indicação</option>
+                  </select>
                 </div>
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-black text-slate-500 uppercase tracking-widest mb-2">Categoria</label>
+                <input
+                  type="text"
+                  value={newBillData.category || ''}
+                  onChange={(e) => setNewBillData({ ...newBillData, category: e.target.value })}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-bold text-slate-700 outline-none focus:ring-2 focus:ring-blue-500"
+                  required
+                  placeholder="Ex: Saúde, Educação..."
+                />
               </div>
 
               <div>
@@ -295,7 +313,7 @@ const BillsList: React.FC<BillsListProps> = ({ bills, onStartVoting, onUpdateBil
       {/* Header e Busca */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-6 rounded-3xl border border-slate-200 shadow-sm">
         <div>
-          <h2 className="text-xl font-black text-slate-800 tracking-tight">Acervo Legislativo</h2>
+          <h2 className="text-xl font-black text-slate-800 tracking-tight">Ordem do Dia</h2>
           <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mt-1">Consulte e gerencie matérias em tramitação</p>
         </div>
         <div className="flex items-center gap-3">
@@ -327,6 +345,10 @@ const BillsList: React.FC<BillsListProps> = ({ bills, onStartVoting, onUpdateBil
                   <div className="flex items-center gap-3">
                     <span className="px-3 py-1 bg-slate-100 text-slate-500 rounded-lg text-[10px] font-black uppercase tracking-widest border border-slate-200">
                       {bill.id}
+                    </span>
+                    <span className={`px-3 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest border ${bill.type === 'INDICATION' ? 'bg-purple-100 text-purple-700 border-purple-200' : 'bg-blue-50 text-blue-600 border-blue-100'
+                      }`}>
+                      {typeMap[bill.type] || 'Projeto'}
                     </span>
                     <span className={`px-3 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest border ${getStatusBadge(bill.status)}`}>
                       {statusMap[bill.status] || bill.status}

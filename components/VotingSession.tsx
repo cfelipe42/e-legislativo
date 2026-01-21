@@ -8,6 +8,7 @@ interface VotingSessionProps {
   activeBill: Bill | null;
   onVote: (councilmanId: string, vote: VoteValue) => void;
   onToggleFloorRequest: (councilmanId: string, status?: boolean) => void;
+  onToggleInterventionRequest: (councilmanId: string) => void;
   onAuthorizeSpeech: (councilmanId: string) => void;
   onAddExtraTime: () => void;
   onComplete: (results: any) => void;
@@ -18,6 +19,7 @@ interface VotingSessionProps {
   connectedCouncilmanId?: string;
   isVotingOpen?: boolean;
   onOpenVoting?: () => void;
+  onOpenTransmission?: () => void;
 }
 
 const VotingSession: React.FC<VotingSessionProps> = ({
@@ -25,6 +27,7 @@ const VotingSession: React.FC<VotingSessionProps> = ({
   activeBill,
   onVote,
   onToggleFloorRequest,
+  onToggleInterventionRequest,
   onAuthorizeSpeech,
   onAddExtraTime,
   onComplete,
@@ -34,7 +37,8 @@ const VotingSession: React.FC<VotingSessionProps> = ({
   speakingTimeLimit = 600,
   connectedCouncilmanId,
   isVotingOpen = false,
-  onOpenVoting
+  onOpenVoting,
+  onOpenTransmission
 }) => {
   const [showRequestToast, setShowRequestToast] = useState(false);
   const [isProcessingRequest, setIsProcessingRequest] = useState(false);
@@ -71,42 +75,56 @@ const VotingSession: React.FC<VotingSessionProps> = ({
     onVote(myId, vote);
   };
 
+  const playTone = (freq: number, start: number, duration: number) => {
+    try {
+      const context = new (window.AudioContext || (window as any).webkitAudioContext)();
+      const osc = context.createOscillator();
+      const gain = context.createGain();
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(freq, context.currentTime + start);
+      gain.gain.setValueAtTime(0.2, context.currentTime + start);
+      gain.gain.exponentialRampToValueAtTime(0.0001, context.currentTime + start + duration);
+      osc.connect(gain);
+      gain.connect(context.destination);
+      osc.start(context.currentTime + start);
+      osc.stop(context.currentTime + start + duration);
+    } catch (e) {
+      console.log('Audio not supported', e);
+    }
+  };
+
   const ringBell = () => {
     setIsBellRinging(true);
     setShowOrderAlert(true);
 
-    // Simulação do som "Triiiim" usando AudioContext com alta frequência
-    try {
-      const context = new (window.AudioContext || (window as any).webkitAudioContext)();
-
-      const playTone = (freq: number, start: number, duration: number) => {
-        const osc = context.createOscillator();
-        const gain = context.createGain();
-        osc.type = 'triangle'; // Som mais metálico que o sine
-        osc.frequency.setValueAtTime(freq, context.currentTime + start);
-        gain.gain.setValueAtTime(0.2, context.currentTime + start);
-        gain.gain.exponentialRampToValueAtTime(0.0001, context.currentTime + start + duration);
-        osc.connect(gain);
-        gain.connect(context.destination);
-        osc.start(context.currentTime + start);
-        osc.stop(context.currentTime + start + duration);
-      };
-
-      // Sequência para simular o "Triiiim" (campainha mecânica)
-      playTone(2500, 0, 0.4);
-      playTone(2550, 0.05, 0.4);
-      playTone(2450, 0.1, 0.4);
-      playTone(2600, 0.15, 0.4);
-
-    } catch (e) {
-      console.log('Audio feedback not supported');
-    }
+    // Simulação do som "Triiiim"
+    playTone(2500, 0, 0.4);
+    playTone(2550, 0.05, 0.4);
+    playTone(2450, 0.1, 0.4);
+    playTone(2600, 0.15, 0.4);
 
     setTimeout(() => {
       setIsBellRinging(false);
       setTimeout(() => setShowOrderAlert(false), 2500);
     }, 600);
   };
+
+  // Timer Warning Sounds
+  useEffect(() => {
+    if (!activeSpeakerId) return;
+
+    // Warning at 9 minutes (540s) - 1 minute remaining
+    if (speakingTimeElapsed === 540) {
+      playTone(880, 0, 1.0); // Long beep
+    }
+
+    // End at 10 minutes (600s)
+    if (speakingTimeElapsed === 600) {
+      playTone(440, 0, 0.5);
+      playTone(440, 0.6, 0.5);
+      playTone(440, 1.2, 1.0);
+    }
+  }, [speakingTimeElapsed, activeSpeakerId]);
 
   const handleFloorRequestWithFeedback = () => {
     if (myData?.isRequestingFloor) {
@@ -256,6 +274,27 @@ const VotingSession: React.FC<VotingSessionProps> = ({
                     Encerrar Votação <i className="fa-solid fa-gavel"></i>
                   </button>
                 )}
+
+                {isPresident && (
+                  <button
+                    onClick={() => {
+                      playTone(600, 0, 0.2);
+                      alert("Quebra de Interstício Solicitada ao Plenário.");
+                    }}
+                    className="px-8 py-3 bg-slate-700 hover:bg-slate-600 text-white font-black text-[10px] uppercase rounded-2xl shadow-lg transition-all border border-slate-600"
+                  >
+                    Quebra de Interstício
+                  </button>
+                )}
+
+                {onOpenTransmission && (
+                  <button
+                    onClick={onOpenTransmission}
+                    className="px-8 py-3 bg-red-600 hover:bg-red-500 text-white font-black text-[10px] uppercase rounded-2xl shadow-lg transition-all border border-red-500 flex items-center justify-center gap-2"
+                  >
+                    <i className="fa-brands fa-youtube"></i> Transmissão
+                  </button>
+                )}
               </div>
             )}
           </div>
@@ -273,7 +312,6 @@ const VotingSession: React.FC<VotingSessionProps> = ({
                 <p className="mt-4 text-slate-500 text-sm leading-relaxed">{activeBill.description}</p>
               </div>
 
-              {/* Voting Controls (Only visible when voting is open) */}
               {isVotingOpen ? (
                 hasCouncilPowers && (
                   <div className="mt-8 pt-8 border-t border-slate-100 grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -289,11 +327,30 @@ const VotingSession: React.FC<VotingSessionProps> = ({
                   </div>
                 )
               ) : (
-                <div className="mt-8 pt-8 border-t border-slate-100 text-center">
-                  <div className="inline-block px-6 py-2 bg-amber-100 text-amber-700 rounded-full font-black text-xs uppercase tracking-widest border border-amber-200">
-                    <i className="fa-solid fa-comments mr-2"></i> Em Discussão
+                <div className="mt-8 pt-8 border-t border-slate-100">
+                  <div className="text-center mb-6">
+                    <div className="inline-block px-6 py-2 bg-amber-100 text-amber-700 rounded-full font-black text-xs uppercase tracking-widest border border-amber-200">
+                      <i className="fa-solid fa-comments mr-2"></i> Em Discussão
+                    </div>
+                    <p className="mt-2 text-slate-400 text-[10px] font-bold uppercase tracking-widest">Oradores inscritos podem fazer uso da palavra</p>
                   </div>
-                  <p className="mt-4 text-slate-400 text-[10px] font-bold uppercase tracking-widest">Aguarde o início da votação</p>
+
+                  {hasCouncilPowers && (
+                    <div className="grid grid-cols-2 gap-4 max-w-lg mx-auto">
+                      <button
+                        onClick={handleFloorRequestWithFeedback}
+                        className={`py-4 rounded-2xl font-black text-xs uppercase tracking-widest border-b-4 transition-all ${myData?.isRequestingFloor ? 'bg-amber-100 text-amber-700 border-amber-300' : 'bg-slate-50 text-slate-500 border-slate-200 hover:bg-blue-50 hover:text-blue-600 hover:border-blue-200'}`}
+                      >
+                        <i className="fa-solid fa-microphone-lines mr-2"></i> Pedir Palavra
+                      </button>
+                      <button
+                        onClick={() => onToggleInterventionRequest(myId)}
+                        className={`py-4 rounded-2xl font-black text-xs uppercase tracking-widest border-b-4 transition-all ${myData?.isRequestingIntervention ? 'bg-blue-100 text-blue-700 border-blue-300' : 'bg-slate-50 text-slate-500 border-slate-200 hover:bg-blue-50 hover:text-blue-600 hover:border-blue-200'}`}
+                      >
+                        <i className="fa-solid fa-hand-point-up mr-2"></i> Pedir Aparte
+                      </button>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
