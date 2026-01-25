@@ -299,15 +299,6 @@ const VotingSession: React.FC<VotingSessionProps> = ({
                     Quebra de Interstício
                   </button>
                 )}
-
-                {onOpenTransmission && (
-                  <button
-                    onClick={onOpenTransmission}
-                    className="px-8 py-3 bg-red-600 hover:bg-red-500 text-white font-black text-[10px] uppercase rounded-2xl shadow-lg transition-all border border-red-500 flex items-center justify-center gap-2"
-                  >
-                    <i className="fa-brands fa-youtube"></i> Transmissão
-                  </button>
-                )}
               </div>
             )}
           </div>
@@ -328,13 +319,25 @@ const VotingSession: React.FC<VotingSessionProps> = ({
               {isVotingOpen ? (
                 hasCouncilPowers && (
                   <div className="mt-8 pt-8 border-t border-slate-100 grid grid-cols-1 sm:grid-cols-3 gap-4">
-                    <button onClick={() => handleVoteWithFeedback(VoteValue.YES)} className={`py-6 rounded-2xl font-black text-sm transition-all border-b-4 ${myData?.currentVote === VoteValue.YES ? 'bg-emerald-600 border-emerald-800 text-white scale-105 shadow-xl' : 'bg-slate-50 border-slate-200 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50'}`}>
+                    <button
+                      disabled={myData?.currentVote !== VoteValue.PENDING}
+                      onClick={() => handleVoteWithFeedback(VoteValue.YES)}
+                      className={`py-6 rounded-2xl font-black text-sm transition-all border-b-4 ${myData?.currentVote === VoteValue.YES ? 'bg-emerald-600 border-emerald-800 text-white scale-105 shadow-xl' : myData?.currentVote !== VoteValue.PENDING ? 'bg-slate-100 border-slate-200 text-slate-300 cursor-not-allowed opacity-50' : 'bg-slate-50 border-slate-200 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50'}`}
+                    >
                       <i className="fa-solid fa-check-circle text-xl mb-2 block"></i> VOTAR SIM
                     </button>
-                    <button onClick={() => handleVoteWithFeedback(VoteValue.NO)} className={`py-6 rounded-2xl font-black text-sm transition-all border-b-4 ${myData?.currentVote === VoteValue.NO ? 'bg-rose-600 border-rose-800 text-white scale-105 shadow-xl' : 'bg-slate-50 border-slate-200 text-slate-400 hover:text-rose-600 hover:bg-rose-50'}`}>
+                    <button
+                      disabled={myData?.currentVote !== VoteValue.PENDING}
+                      onClick={() => handleVoteWithFeedback(VoteValue.NO)}
+                      className={`py-6 rounded-2xl font-black text-sm transition-all border-b-4 ${myData?.currentVote === VoteValue.NO ? 'bg-rose-600 border-rose-800 text-white scale-105 shadow-xl' : myData?.currentVote !== VoteValue.PENDING ? 'bg-slate-100 border-slate-200 text-slate-300 cursor-not-allowed opacity-50' : 'bg-slate-50 border-slate-200 text-slate-400 hover:text-rose-600 hover:bg-rose-50'}`}
+                    >
                       <i className="fa-solid fa-times-circle text-xl mb-2 block"></i> VOTAR NÃO
                     </button>
-                    <button onClick={() => handleVoteWithFeedback(VoteValue.ABSTAIN)} className={`py-6 rounded-2xl font-black text-sm transition-all border-b-4 ${myData?.currentVote === VoteValue.ABSTAIN ? 'bg-slate-800 border-slate-900 text-white scale-105 shadow-xl' : 'bg-slate-50 border-slate-200 text-slate-400 hover:text-slate-800 hover:bg-slate-100'}`}>
+                    <button
+                      disabled={myData?.currentVote !== VoteValue.PENDING}
+                      onClick={() => handleVoteWithFeedback(VoteValue.ABSTAIN)}
+                      className={`py-6 rounded-2xl font-black text-sm transition-all border-b-4 ${myData?.currentVote === VoteValue.ABSTAIN ? 'bg-slate-800 border-slate-900 text-white scale-105 shadow-xl' : myData?.currentVote !== VoteValue.PENDING ? 'bg-slate-100 border-slate-200 text-slate-300 cursor-not-allowed opacity-50' : 'bg-slate-50 border-slate-200 text-slate-400 hover:text-slate-800 hover:bg-slate-100'}`}
+                    >
                       <i className="fa-solid fa-minus-circle text-xl mb-2 block"></i> ABSTER-SE
                     </button>
                   </div>
@@ -556,7 +559,7 @@ const VotingSession: React.FC<VotingSessionProps> = ({
           </div>
         )}
       </div>
-    </div >
+    </div>
   );
 };
 
