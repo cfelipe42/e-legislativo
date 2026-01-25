@@ -340,7 +340,7 @@ const App: React.FC = () => {
   const handleOpenTransmission = () => {
     // URL hardcoded for now or fetched from config?
     // Using a placeholder that user can request to change later
-    const transmissionUrl = "https://www.youtube.com/live_dashboard";
+    const transmissionUrl = "https://www.youtube.com/embed/live_stream?channel=UC-97rnvd90"; // Exemplo de URL de transmissão oficial
     window.open(transmissionUrl, '_blank', 'noopener,noreferrer');
   };
 
@@ -593,6 +593,7 @@ const App: React.FC = () => {
               userRole={userRole}
               activeSpeakerId={activeSpeakerId}
               speakingTimeElapsed={speakingTimeElapsed}
+              userCity={userCity}
             />
           )}
           {activeTab === 'history' && <History history={history} />}

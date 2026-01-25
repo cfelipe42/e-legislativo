@@ -393,7 +393,7 @@ const BillsList: React.FC<BillsListProps> = ({ bills, onStartVoting, onUpdateBil
                     </>
                   )}
 
-                  {canManage && (bill.status === 'PENDING' || bill.status === 'DISCUSSION' || bill.status === 'VOTING') && (
+                  {canManage && (
                     <button
                       onClick={() => onStartVoting(bill.id)}
                       className="px-5 py-3 bg-green-600 hover:bg-green-500 text-white font-black text-[10px] uppercase tracking-widest rounded-xl transition-all shadow-lg shadow-green-500/20 flex items-center justify-center gap-2"

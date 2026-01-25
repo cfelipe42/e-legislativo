@@ -12,10 +12,17 @@ interface LayoutProps {
 }
 
 const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab, userRole = 'clerk', userName, userAvatar, isOnline = false }) => {
+  const [currentTime, setCurrentTime] = React.useState(new Date());
+
+  React.useEffect(() => {
+    const timer = setInterval(() => setCurrentTime(new Date()), 1000);
+    return () => clearInterval(timer);
+  }, []);
+
   const allTabs = [
     { id: 'dashboard', label: 'Painel Geral', icon: 'fa-chart-line', restricted: true },
     { id: 'session', label: 'Sessão Plenária', icon: 'fa-gavel', restricted: false },
-    { id: 'bills', label: 'Projetos de Lei', icon: 'fa-file-invoice', restricted: false },
+    { id: 'bills', label: 'Ordem do Dia', icon: 'fa-file-invoice', restricted: false },
     { id: 'management', label: 'Gestão de Vereadores', icon: 'fa-users-gear', restricted: true },
     { id: 'history', label: 'Histórico', icon: 'fa-history', restricted: true },
     { id: 'moderation', label: 'Moderação', icon: 'fa-gears', restricted: true, onlyModerator: true },
@@ -128,7 +135,7 @@ const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab, user
           <div className="flex items-center gap-6">
             <div className="hidden md:flex items-center gap-3 px-4 py-2 bg-slate-50 rounded-xl border border-slate-100">
               <i className="fa-regular fa-clock text-slate-400"></i>
-              <span className="text-xs font-black text-slate-600">{new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</span>
+              <span className="text-xs font-black text-slate-600">{currentTime.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</span>
             </div>
 
             <button

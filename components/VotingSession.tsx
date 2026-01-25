@@ -21,6 +21,7 @@ interface VotingSessionProps {
   onOpenVoting?: () => void;
   onOpenTransmission?: () => void;
   onlineUsers?: string[];
+  userCity?: string;
 }
 
 const VotingSession: React.FC<VotingSessionProps> = ({
@@ -40,7 +41,8 @@ const VotingSession: React.FC<VotingSessionProps> = ({
   isVotingOpen = false,
   onOpenVoting,
   onOpenTransmission,
-  onlineUsers = []
+  onlineUsers = [],
+  userCity = ''
 }) => {
   const [showRequestToast, setShowRequestToast] = useState(false);
   const [isProcessingRequest, setIsProcessingRequest] = useState(false);
@@ -111,22 +113,27 @@ const VotingSession: React.FC<VotingSessionProps> = ({
     }, 600);
   };
 
-  // Timer Warning Sounds
+  // Timer Warning Sounds and Auto-Stop
   useEffect(() => {
     if (!activeSpeakerId) return;
 
     // Warning at 9 minutes (540s) - 1 minute remaining
     if (speakingTimeElapsed === 540) {
       playTone(880, 0, 1.0); // Long beep
+      console.log("Speech Alert: 1 minute remaining");
     }
 
     // End at 10 minutes (600s)
-    if (speakingTimeElapsed === 600) {
-      playTone(440, 0, 0.5);
-      playTone(440, 0.6, 0.5);
-      playTone(440, 1.2, 1.0);
+    if (speakingTimeElapsed >= 600) {
+      if (speakingTimeElapsed === 600) {
+        playTone(440, 0, 0.5);
+        playTone(440, 0.6, 0.5);
+        playTone(440, 1.2, 1.0);
+      }
+      // Automaticaly end speech if reached limit
+      onToggleFloorRequest(activeSpeakerId, false);
     }
-  }, [speakingTimeElapsed, activeSpeakerId]);
+  }, [speakingTimeElapsed, activeSpeakerId, onToggleFloorRequest]);
 
   const handleFloorRequestWithFeedback = () => {
     if (myData?.isRequestingFloor) {
@@ -162,6 +169,8 @@ const VotingSession: React.FC<VotingSessionProps> = ({
 
     if (councilman.id === connectedCouncilmanId) {
       styles += 'ring-4 ring-blue-500 ring-offset-2 shadow-2xl z-20 ';
+    } else if (councilman.isSpeaking) {
+      styles += 'ring-4 ring-rose-500 ring-offset-2 animate-pulse shadow-2xl z-20 ';
     } else if (councilman.currentVote !== VoteValue.PENDING) {
       styles += 'shadow-lg shadow-black/5 scale-[1.02] z-10 ';
     } else {
@@ -279,13 +288,13 @@ const VotingSession: React.FC<VotingSessionProps> = ({
                   </button>
                 )}
 
-                {isPresident && (
+                {isPresident && userCity === 'Itagimirim' && (
                   <button
                     onClick={() => {
                       playTone(600, 0, 0.2);
                       alert("Quebra de Interstício Solicitada ao Plenário.");
                     }}
-                    className="px-8 py-3 bg-slate-700 hover:bg-slate-600 text-white font-black text-[10px] uppercase rounded-2xl shadow-lg transition-all border border-slate-600"
+                    className="px-8 py-3 bg-slate-700 hover:bg-slate-600 text-white font-black text-[10px] uppercase rounded-2xl shadow-lg transition-all border border-slate-600 animate-pulse"
                   >
                     Quebra de Interstício
                   </button>
@@ -351,7 +360,7 @@ const VotingSession: React.FC<VotingSessionProps> = ({
                         onClick={() => onToggleInterventionRequest(myId)}
                         className={`py-4 rounded-2xl font-black text-xs uppercase tracking-widest border-b-4 transition-all ${myData?.isRequestingIntervention ? 'bg-blue-100 text-blue-700 border-blue-300' : 'bg-slate-50 text-slate-500 border-slate-200 hover:bg-blue-50 hover:text-blue-600 hover:border-blue-200'}`}
                       >
-                        <i className="fa-solid fa-hand-point-up mr-2"></i> Pedir Aparte
+                        <i className="fa-solid fa-hand-point-up mr-2"></i> Pedir Parte
                       </button>
                     </div>
                   )}
@@ -547,7 +556,7 @@ const VotingSession: React.FC<VotingSessionProps> = ({
           </div>
         )}
       </div>
-    </div>
+    </div >
   );
 };
 
