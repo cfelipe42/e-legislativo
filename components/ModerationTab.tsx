@@ -11,6 +11,7 @@ interface ModerationTabProps {
   onAddCouncilman: (newCouncilman: Councilman) => void;
   accounts: UserAccount[];
   onAddAccount: (newAccount: UserAccount, linkedCouncilmanId?: string) => void;
+  onlineUsers?: string[];
 }
 
 const ModerationTab: React.FC<ModerationTabProps> = ({
@@ -22,7 +23,8 @@ const ModerationTab: React.FC<ModerationTabProps> = ({
   onUpdateCouncilman,
   onAddCouncilman,
   accounts,
-  onAddAccount
+  onAddAccount,
+  onlineUsers = []
 }) => {
   const [activeSubTab, setActiveSubTab] = useState<'network' | 'legislators' | 'accounts'>('network');
   const [editingCity, setEditingCity] = useState<string | null>(null);
@@ -243,7 +245,14 @@ const ModerationTab: React.FC<ModerationTabProps> = ({
                 <div className="p-5 flex flex-col items-center text-center">
                   <img src={c.avatar} className="w-20 h-20 rounded-2xl object-cover border-4 border-slate-50 shadow-md mb-4" alt={c.name} />
                   <h4 className="font-black text-slate-800 uppercase text-xs leading-tight mb-1">{c.name}</h4>
-                  <p className="text-[10px] font-black text-purple-600 uppercase tracking-widest mb-4">{c.party}</p>
+                  <p className="text-[10px] font-black text-purple-600 uppercase tracking-widest mb-1">{c.party}</p>
+
+                  <div className="flex items-center gap-2 mb-4">
+                    <div className={`w-2 h-2 rounded-full ${onlineUsers.includes(c.id) ? 'bg-emerald-500 animate-pulse' : 'bg-slate-300'}`}></div>
+                    <span className={`text-[8px] font-black uppercase tracking-tighter ${onlineUsers.includes(c.id) ? 'text-emerald-500' : 'text-slate-400'}`}>
+                      {onlineUsers.includes(c.id) ? 'Online' : 'Offline'}
+                    </span>
+                  </div>
 
                   <div className="flex gap-2 w-full">
                     <button

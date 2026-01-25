@@ -13,6 +13,7 @@ export interface ChamberConfig {
   lastSessionDate?: string;
   activeBillId?: string | null;
   activeSpeakerId?: string | null;
+  activeSpeakerStartTime?: string | null;
   isVotingOpen?: boolean;
 }
 
@@ -53,7 +54,7 @@ export interface Bill {
   author: string;
   category: string;
   type: 'PL' | 'INDICATION';
-  status: 'PENDING' | 'VOTING' | 'APPROVED' | 'REJECTED';
+  status: 'PENDING' | 'DISCUSSION' | 'VOTING' | 'APPROVED' | 'REJECTED';
   fullText: string;
 }
 

@@ -39,6 +39,7 @@ const App: React.FC = () => {
   const [speakingTimeElapsed, setSpeakingTimeElapsed] = useState(0);
   const [activeSpeakerId, setActiveSpeakerId] = useState<string | null>(null);
   const [history, setHistory] = useState<SessionHistory[]>([]);
+  const [onlineUsers, setOnlineUsers] = useState<Set<string>>(new Set());
   const timerRef = useRef<number | null>(null);
 
   useEffect(() => {
@@ -101,10 +102,20 @@ const App: React.FC = () => {
       }
     };
 
-    // 2. Fetch Councilmen
+    // 2. Fetch Councilmen with mapping to CamelCase types
     const fetchCouncilmen = async () => {
       const { data } = await supabase.from('councilmen').select('*').eq('city', userCity);
-      if (data) setCouncilmen(data as any);
+      if (data) {
+        const mapped = data.map((c: any) => ({
+          ...c,
+          isPresent: c.is_present,
+          currentVote: c.current_vote,
+          isRequestingFloor: c.is_requesting_floor,
+          isRequestingIntervention: c.is_requesting_intervention,
+          isSpeaking: c.is_speaking
+        }));
+        setCouncilmen(mapped as Councilman[]);
+      }
     };
 
     fetchConfigs();
@@ -125,22 +136,49 @@ const App: React.FC = () => {
           ...raw as any,
           activeBillId: raw.active_bill_id,
           activeSpeakerId: raw.active_speaker_id,
+          activeSpeakerStartTime: raw.active_speaker_start_time,
           isVotingOpen: raw.is_voting_open
         };
+
+        // Auto-navigation: If a new bill is started, jump to session tab
+        if (raw.active_bill_id && raw.active_bill_id !== (payload.old as any)?.active_bill_id) {
+          setActiveTab('session');
+        }
+
         setChamberConfigs(prev => prev.map(c => c.city === newConfig.city ? newConfig : c));
         setActiveBillId(newConfig.activeBillId || null);
         setActiveSpeakerId(newConfig.activeSpeakerId || null);
+
+        // Timer Sync Logic
+        if (newConfig.activeSpeakerId && newConfig.activeSpeakerStartTime) {
+          const startTime = new Date(newConfig.activeSpeakerStartTime).getTime();
+          const now = Date.now();
+          const elapsed = Math.floor((now - startTime) / 1000);
+          setSpeakingTimeElapsed(Math.max(0, elapsed));
+        } else if (!newConfig.activeSpeakerId) {
+          setSpeakingTimeElapsed(0);
+        }
       })
       .subscribe();
 
-    // Listen to Councilmen changes (Votes & Presence)
     const councilmenSub = supabase
       .channel('public:councilmen')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'councilmen', filter: `city=eq.${userCity}` }, payload => {
+        const mapCouncilman = (c: any): Councilman => ({
+          ...c,
+          isPresent: c.is_present,
+          currentVote: c.current_vote,
+          isRequestingFloor: c.is_requesting_floor,
+          isRequestingIntervention: c.is_requesting_intervention,
+          isSpeaking: c.is_speaking
+        });
+
         if (payload.eventType === 'UPDATE') {
-          setCouncilmen(prev => prev.map(c => c.id === payload.new.id ? payload.new as Councilman : c));
+          const mapped = mapCouncilman(payload.new);
+          setCouncilmen(prev => prev.map(c => c.id === mapped.id ? mapped : c));
         } else if (payload.eventType === 'INSERT') {
-          setCouncilmen(prev => [...prev, payload.new as Councilman]);
+          const mapped = mapCouncilman(payload.new);
+          setCouncilmen(prev => [...prev, mapped]);
         }
       })
       .subscribe();
@@ -150,6 +188,43 @@ const App: React.FC = () => {
       supabase.removeChannel(councilmenSub);
     };
   }, [isAuthenticated, userCity]);
+
+  // Presence Subscription (Scoped by city)
+  useEffect(() => {
+    if (!isAuthenticated || !currentCouncilmanId || !userCity) return;
+
+    const channelName = `presence:${userCity}`;
+    const channel = supabase.channel(channelName);
+
+    channel
+      .on('presence', { event: 'sync' }, () => {
+        const state = channel.presenceState();
+        const onlineIds = new Set<string>();
+        Object.keys(state).forEach(key => {
+          state[key].forEach((p: any) => {
+            if (p.councilmanId) onlineIds.add(p.councilmanId);
+          });
+        });
+        console.log('Online Users Sync:', Array.from(onlineIds));
+        setOnlineUsers(onlineIds);
+      })
+      .on('presence', { event: 'join' }, ({ key, newPresences }) => {
+        console.log('User Joined:', key, newPresences);
+      })
+      .subscribe(async (status) => {
+        if (status === 'SUBSCRIBED') {
+          console.log('Presence Subscribed. Tracking ID:', currentCouncilmanId);
+          await channel.track({
+            councilmanId: currentCouncilmanId,
+            onlineAt: new Date().toISOString(),
+          });
+        }
+      });
+
+    return () => {
+      channel.unsubscribe();
+    };
+  }, [isAuthenticated, currentCouncilmanId, userCity]);
 
   // Sync Active Bill from loaded config
   useEffect(() => {
@@ -236,14 +311,20 @@ const App: React.FC = () => {
 
   useEffect(() => {
     if (activeSpeakerId) {
+      // Find start time from config
+      const config = chamberConfigs.find(c => c.city === userCity);
+      const startTimeStr = config?.activeSpeakerStartTime;
+
       timerRef.current = window.setInterval(() => {
-        setSpeakingTimeElapsed(v => {
-          if (v >= 600) {
-            return 600; // Hard stop at 10 minutes
-          }
-          // Warning sound at 9 mins (540s) handled in VotingSession per visual feedback loop
-          return v + 1;
-        });
+        if (startTimeStr) {
+          const startTime = new Date(startTimeStr).getTime();
+          const now = Date.now();
+          const elapsed = Math.floor((now - startTime) / 1000);
+          setSpeakingTimeElapsed(Math.min(600, Math.max(0, elapsed)));
+        } else {
+          // Fallback if no start time (shouldn't happen with new logic, but safe)
+          setSpeakingTimeElapsed(v => Math.min(600, v + 1));
+        }
       }, 1000);
     } else {
       if (timerRef.current) {
@@ -254,7 +335,7 @@ const App: React.FC = () => {
     return () => {
       if (timerRef.current) clearInterval(timerRef.current);
     };
-  }, [activeSpeakerId]);
+  }, [activeSpeakerId, chamberConfigs, userCity]);
 
   const handleOpenTransmission = () => {
     // URL hardcoded for now or fetched from config?
@@ -278,10 +359,21 @@ const App: React.FC = () => {
     }
   };
 
-  const handleToggleFloorRequest = async (id: string, status?: boolean) => {
+  const handleUpdateCouncilman = async (u: Councilman) => {
+    // Optimistic update
+    setCouncilmen(prev => prev.map(c => c.id === u.id ? u : c));
+    // Actual DB Update
+    await supabase.from('councilmen').update({
+      name: u.name,
+      party: u.party,
+      avatar: u.avatar
+    }).eq('id', u.id);
+  };
+
+  const handleToggleFloorRequest = async (councilmanId: string, status?: boolean) => {
     // Optimistic Update
     setCouncilmen(prev => prev.map(c => {
-      if (c.id === id) {
+      if (c.id === councilmanId) {
         const newStatus = status !== undefined ? status : !c.isRequestingFloor;
         return { ...c, isRequestingFloor: newStatus };
       }
@@ -289,11 +381,11 @@ const App: React.FC = () => {
     }));
 
     // Allow passing explicit status or toggling current based on local state (might be racey but ok for MVP)
-    const councilman = councilmen.find(c => c.id === id);
+    const councilman = councilmen.find(c => c.id === councilmanId);
     const newStatus = status !== undefined ? status : !councilman?.isRequestingFloor;
-    await supabase.from('councilmen').update({ isRequestingFloor: newStatus }).eq('id', id);
+    await supabase.from('councilmen').update({ isRequestingFloor: newStatus }).eq('id', councilmanId);
 
-    if (status === false && activeSpeakerId === id) {
+    if (status === false && activeSpeakerId === councilmanId) {
       setActiveSpeakerId(null);
       setSpeakingTimeElapsed(0);
       await supabase.from('chamber_configs').update({ activeSpeakerId: null }).eq('city', userCity);
@@ -372,10 +464,18 @@ const App: React.FC = () => {
       is_voting_open: false,
       active_speaker_id: null
     }).eq('city', userCity);
+
+    // Sync bill status
+    await supabase.from('bills').update({ status: 'DISCUSSION' }).eq('id', billId);
   };
 
   const handleOpenVoting = async () => {
     await supabase.from('chamber_configs').update({ is_voting_open: true }).eq('city', userCity);
+
+    // Sync bill status to VOTING
+    if (activeBillId) {
+      await supabase.from('bills').update({ status: 'VOTING' }).eq('id', activeBillId);
+    }
   };
 
   const handleVote = async (councilmanId: string, vote: VoteValue) => {
@@ -395,13 +495,23 @@ const App: React.FC = () => {
 
 
   const activeBill = bills.find(b => b.id === activeBillId) || null;
+  const activeCouncilmanObj = councilmen.find(c => c.id === currentCouncilmanId);
+  const displayUserName = activeCouncilmanObj ? activeCouncilmanObj.name : userName;
+  const displayUserAvatar = activeCouncilmanObj ? activeCouncilmanObj.avatar : undefined;
 
   return (
     <div className="min-h-screen">
       {!isAuthenticated ? (
         <Login onLogin={handleLogin} chamberConfigs={chamberConfigs} />
       ) : (
-        <Layout activeTab={activeTab} setActiveTab={setActiveTab} userRole={userRole} userName={userName}>
+        <Layout
+          userName={displayUserName}
+          userRole={userRole}
+          userAvatar={displayUserAvatar}
+          activeTab={activeTab}
+          setActiveTab={setActiveTab}
+          isOnline={currentCouncilmanId ? onlineUsers.has(currentCouncilmanId) : true}
+        >
           <div className="mb-4">
             <span className="bg-slate-800 text-white text-[10px] px-3 py-1 rounded-full font-bold uppercase">
               Câmara de {userCity} | Perfil: {userRole}
@@ -417,14 +527,37 @@ const App: React.FC = () => {
               onVote={handleVote}
               onToggleFloorRequest={handleToggleFloorRequest}
               onToggleInterventionRequest={handleToggleInterventionRequest}
-              onAuthorizeSpeech={(id) => { setActiveSpeakerId(id); setSpeakingTimeElapsed(0); }}
-              onAddExtraTime={() => setSpeakingTimeElapsed(prev => Math.max(0, prev - 300))}
+              onAuthorizeSpeech={async (id) => {
+                const startTime = new Date().toISOString();
+                setActiveSpeakerId(id);
+                setSpeakingTimeElapsed(0);
+                await supabase.from('chamber_configs').update({
+                  active_speaker_id: id,
+                  active_speaker_start_time: startTime
+                }).eq('city', userCity);
+              }}
+              onAddExtraTime={() => {
+                // To add time, we effectively push the start time back
+                // New elapsed = Old elapsed - 300
+                // New Start = Now - (Old elapsed - 300)
+                // This is complex, easier to just manipulate local for now OR update start_time
+                // For "Live" sync, better to update start_time:
+                // New Start Time = Current Start Time + 5 minutes? No, that Reduces elapsed.
+                // We want to reduce elapsed time by 5 mins.
+                // So new Start Time = Current Start Time + 5 minutes.
+                const config = chamberConfigs.find(c => c.city === userCity);
+                if (config?.activeSpeakerStartTime) {
+                  const newStart = new Date(new Date(config.activeSpeakerStartTime).getTime() + (5 * 60 * 1000)).toISOString();
+                  supabase.from('chamber_configs').update({ active_speaker_start_time: newStart }).eq('city', userCity).then();
+                }
+              }}
 
               // New Props for Voting Phase
               connectedCouncilmanId={currentCouncilmanId}
               isVotingOpen={chamberConfigs.find(c => c.city === userCity)?.isVotingOpen || false}
               onOpenVoting={handleOpenVoting}
               onOpenTransmission={handleOpenTransmission}
+              onlineUsers={Array.from(onlineUsers)}
 
               onComplete={(stats) => {
                 const newH: SessionHistory = {
@@ -463,17 +596,8 @@ const App: React.FC = () => {
             />
           )}
           {activeTab === 'history' && <History history={history} />}
-          {activeTab === 'plenary' && <PlenaryDisplay city={userCity} activeBill={activeBill} councilmen={councilmen} onBack={() => setActiveTab('session')} sessionTitle="Sessão Ordinária" activeSpeakerId={activeSpeakerId} speakingTimeElapsed={speakingTimeElapsed} />}
-          {activeTab === 'management' && <CouncilmenManagement councilmen={councilmen} onUpdateCouncilman={async (u) => {
-            // Optimistic update
-            setCouncilmen(prev => prev.map(c => c.id === u.id ? u : c));
-            // Actual DB Update
-            await supabase.from('councilmen').update({
-              name: u.name,
-              party: u.party,
-              avatar: u.avatar
-            }).eq('id', u.id);
-          }} />}
+          {activeTab === 'plenary' && <PlenaryDisplay city={userCity} activeBill={activeBill} councilmen={councilmen} onBack={() => setActiveTab('session')} sessionTitle="Sessão Ordinária" activeSpeakerId={activeSpeakerId} speakingTimeElapsed={speakingTimeElapsed} onlineUsers={Array.from(onlineUsers)} />}
+          {activeTab === 'management' && <CouncilmenManagement councilmen={councilmen} onlineUsers={Array.from(onlineUsers)} onUpdateCouncilman={handleUpdateCouncilman} />}
           {activeTab === 'moderation' && userRole === 'moderator' && (
             <ModerationTab
               chamberConfigs={chamberConfigs}
@@ -481,10 +605,11 @@ const App: React.FC = () => {
               onSwitchCity={setUserCity}
               currentCity={userCity}
               councilmen={councilmen}
-              onUpdateCouncilman={(u) => setCouncilmen(prev => prev.map(c => c.id === u.id ? u : c))}
+              onUpdateCouncilman={handleUpdateCouncilman}
               onAddCouncilman={handleAddCouncilman}
               accounts={accounts}
               onAddAccount={handleAddAccount}
+              onlineUsers={Array.from(onlineUsers)}
             />
           )}
         </Layout>

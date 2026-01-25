@@ -20,6 +20,7 @@ interface VotingSessionProps {
   isVotingOpen?: boolean;
   onOpenVoting?: () => void;
   onOpenTransmission?: () => void;
+  onlineUsers?: string[];
 }
 
 const VotingSession: React.FC<VotingSessionProps> = ({
@@ -38,7 +39,8 @@ const VotingSession: React.FC<VotingSessionProps> = ({
   connectedCouncilmanId,
   isVotingOpen = false,
   onOpenVoting,
-  onOpenTransmission
+  onOpenTransmission,
+  onlineUsers = []
 }) => {
   const [showRequestToast, setShowRequestToast] = useState(false);
   const [isProcessingRequest, setIsProcessingRequest] = useState(false);
@@ -158,7 +160,9 @@ const VotingSession: React.FC<VotingSessionProps> = ({
     const info = getVoteDisplay(councilman.currentVote);
     let styles = `transition-all duration-500 relative group overflow-hidden border-2 rounded-2xl ${info.bg} ${info.border} `;
 
-    if (councilman.currentVote !== VoteValue.PENDING) {
+    if (councilman.id === connectedCouncilmanId) {
+      styles += 'ring-4 ring-blue-500 ring-offset-2 shadow-2xl z-20 ';
+    } else if (councilman.currentVote !== VoteValue.PENDING) {
       styles += 'shadow-lg shadow-black/5 scale-[1.02] z-10 ';
     } else {
       styles += 'opacity-80 ';
@@ -373,6 +377,9 @@ const VotingSession: React.FC<VotingSessionProps> = ({
                 return (
                   <div key={c.id} className={getCardStyles(c)}>
                     <div className="absolute top-3 right-3 z-10 flex flex-col items-end gap-2">
+                      {c.id === connectedCouncilmanId && (
+                        <span className="text-[7px] bg-blue-600 text-white px-2 py-0.5 rounded-full font-black tracking-widest shadow-lg animate-bounce">VOCÊ</span>
+                      )}
                       <i className={`fa-solid ${voteInfo.icon} ${hasVoted ? voteInfo.color + ' text-base' : 'text-slate-200 text-xs'} transition-all duration-500`}></i>
                       {c.isSpeaking && <span className="text-[8px] bg-amber-500 text-white px-1.5 py-0.5 rounded font-black animate-pulse">NO AR</span>}
                     </div>
@@ -384,7 +391,10 @@ const VotingSession: React.FC<VotingSessionProps> = ({
                           className={`w-12 h-12 rounded-xl border border-white/20 object-cover ${!c.isPresent ? 'grayscale' : ''}`}
                           alt={c.name}
                         />
-                        {c.isPresent && <div className="absolute -top-1 -right-1 w-3 h-3 bg-emerald-500 border-2 border-white rounded-full"></div>}
+                        {/* Online Indicator: Shows if present in DB OR active online session */}
+                        {(c.isPresent || onlineUsers.includes(c.id)) && (
+                          <div className={`absolute -top-1 -right-1 w-3 h-3 border-2 border-white rounded-full ${onlineUsers.includes(c.id) ? 'bg-emerald-500 animate-pulse' : 'bg-slate-400'}`} title={onlineUsers.includes(c.id) ? 'Online Agora' : 'Presente (Manual)'}></div>
+                        )}
                       </div>
                       <div className="flex-1 min-w-0">
                         <p className={`text-[11px] font-black truncate leading-none mb-1 uppercase ${hasVoted ? 'text-slate-800' : 'text-slate-500'}`}>
@@ -393,6 +403,12 @@ const VotingSession: React.FC<VotingSessionProps> = ({
                         <p className={`text-[9px] font-bold uppercase ${hasVoted ? 'opacity-50' : 'opacity-30'}`}>
                           {c.party}
                         </p>
+                        <div className="flex items-center gap-1.5 mt-1">
+                          <div className={`w-1.5 h-1.5 rounded-full ${onlineUsers.includes(c.id) ? 'bg-emerald-500 animate-pulse' : 'bg-slate-300'}`}></div>
+                          <span className={`text-[7px] font-black uppercase tracking-tighter ${onlineUsers.includes(c.id) ? 'text-emerald-500' : 'text-slate-400'}`}>
+                            {onlineUsers.includes(c.id) ? 'Conectado' : 'Desconectado'}
+                          </span>
+                        </div>
                       </div>
                     </div>
 

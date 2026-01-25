@@ -7,9 +7,11 @@ interface LayoutProps {
   setActiveTab: (tab: string) => void;
   userRole?: 'clerk' | 'councilman' | 'president' | 'moderator';
   userName?: string;
+  userAvatar?: string;
+  isOnline?: boolean;
 }
 
-const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab, userRole = 'clerk', userName }) => {
+const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab, userRole = 'clerk', userName, userAvatar, isOnline = false }) => {
   const allTabs = [
     { id: 'dashboard', label: 'Painel Geral', icon: 'fa-chart-line', restricted: true },
     { id: 'session', label: 'Sessão Plenária', icon: 'fa-gavel', restricted: false },
@@ -93,8 +95,8 @@ const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab, user
         <div className="p-4 border-t border-white/5 bg-black/10">
           <div className="flex items-center gap-3 p-2">
             <div className="relative">
-              <img src={isClerk || isModerator ? "https://picsum.photos/seed/admin/100/100" : "https://picsum.photos/seed/voter/100/100"} className="w-10 h-10 rounded-full border-2 border-white/10" alt="User" />
-              <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-green-500 border-2 border-indigo-950 rounded-full"></div>
+              <img src={userAvatar || (isClerk || isModerator ? "https://picsum.photos/seed/admin/100/100" : "https://picsum.photos/seed/voter/100/100")} className="w-10 h-10 rounded-full border-2 border-white/10 object-cover" alt="User" />
+              <div className={`absolute -bottom-1 -right-1 w-4 h-4 border-2 border-indigo-950 rounded-full ${isOnline ? 'bg-emerald-500 animate-pulse' : 'bg-slate-500'}`}></div>
             </div>
             <div className="overflow-hidden">
               <p className="text-sm font-black text-white truncate leading-none mb-1">
