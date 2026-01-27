@@ -23,7 +23,7 @@ const INITIAL_CHAMBER_CONFIGS: ChamberConfig[] = [
 const App: React.FC = () => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [userCity, setUserCity] = useState('');
-  const [userRole, setUserRole] = useState<'clerk' | 'councilman' | 'president' | 'moderator'>('clerk');
+  const [userRole, setUserRole] = useState<'clerk' | 'councilman' | 'president' | 'moderator' | 'mesario'>('clerk');
   const [userName, setUserName] = useState('');
   const [activeTab, setActiveTab] = useState('dashboard');
   // Ensure we have activeBillId sync
@@ -381,6 +381,8 @@ const App: React.FC = () => {
       setActiveTab('session');
     } else if (role === 'moderator') {
       setActiveTab('moderation');
+    } else if (role === 'clerk' || role === 'mesario') {
+      setActiveTab('dashboard');
     } else {
       setActiveTab('dashboard');
     }

@@ -6,7 +6,7 @@ import { Bill, SessionHistory, Councilman } from '../types';
 interface DashboardProps {
   bills: Bill[];
   history: SessionHistory[];
-  userRole?: 'clerk' | 'councilman' | 'president' | 'moderator';
+  userRole?: 'clerk' | 'councilman' | 'president' | 'moderator' | 'mesario';
   currentCouncilman?: Councilman;
 }
 

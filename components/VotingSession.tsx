@@ -12,7 +12,7 @@ interface VotingSessionProps {
   onAuthorizeSpeech: (councilmanId: string) => void;
   onAddExtraTime: () => void;
   onComplete: (results: any) => void;
-  userRole?: 'clerk' | 'councilman' | 'president' | 'moderator';
+  userRole?: 'clerk' | 'councilman' | 'president' | 'moderator' | 'mesario';
   activeSpeakerId?: string | null;
   speakingTimeElapsed?: number;
   speakingTimeLimit?: number;
@@ -59,7 +59,7 @@ const VotingSession: React.FC<VotingSessionProps> = ({
   const myId = connectedCouncilmanId || '';
 
   const isPresident = userRole === 'president';
-  const isClerk = userRole === 'clerk';
+  const isClerk = userRole === 'clerk' || userRole === 'mesario';
   const isCouncilman = userRole === 'councilman';
   const isModerator = userRole === 'moderator';
 

@@ -34,7 +34,7 @@ export interface UserAccount {
   id: string;
   cpf: string;
   password: string;
-  role: 'clerk' | 'councilman' | 'president' | 'moderator';
+  role: 'clerk' | 'councilman' | 'president' | 'moderator' | 'mesario';
   city: string;
   allowedIP?: string;
   name: string;

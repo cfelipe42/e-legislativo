@@ -7,7 +7,7 @@ interface BillsListProps {
   onStartVoting: (billId: string) => void;
   onUpdateBill: (updatedBill: Bill) => void;
   onCreateBill?: (bill: Bill) => void;
-  userRole: 'clerk' | 'councilman' | 'president' | 'moderator';
+  userRole: 'clerk' | 'councilman' | 'president' | 'moderator' | 'mesario';
 }
 
 const ITEMS_PER_PAGE = 5;
@@ -61,7 +61,7 @@ const BillsList: React.FC<BillsListProps> = ({ bills, onStartVoting, onUpdateBil
     }
   };
 
-  const canManage = userRole === 'clerk' || userRole === 'president';
+  const canManage = userRole === 'clerk' || userRole === 'president' || userRole === 'mesario';
 
   const handleSaveEdit = (e: React.FormEvent) => {
     e.preventDefault();

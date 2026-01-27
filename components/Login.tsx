@@ -3,12 +3,12 @@ import { ChamberConfig } from '../types';
 import { supabase } from '../services/supabase';
 
 interface LoginProps {
-  onLogin: (city: string, role: 'clerk' | 'councilman' | 'president' | 'moderator') => void;
+  onLogin: (city: string, role: 'clerk' | 'councilman' | 'president' | 'moderator' | 'mesario') => void;
   chamberConfigs: ChamberConfig[];
 }
 
 const Login: React.FC<LoginProps> = ({ onLogin, chamberConfigs }) => {
-  const [activeRole, setActiveRole] = useState<'clerk' | 'councilman' | 'president' | 'moderator'>('clerk');
+  const [activeRole, setActiveRole] = useState<'clerk' | 'councilman' | 'president' | 'moderator' | 'mesario'>('clerk');
   const [city, setCity] = useState('');
   const [cpf, setCpf] = useState('');
   const [password, setPassword] = useState('');
