@@ -44,25 +44,29 @@ const App: React.FC = () => {
 
   useEffect(() => {
     // Helper to resolve user context
-    const resolveUserContext = (session: any) => {
+    const resolveUserContext = async (session: any) => {
       if (!session) return;
 
+      const { role, city, name } = session.user.user_metadata;
       setIsAuthenticated(true);
-      setUserRole(session.user.user_metadata.role || 'clerk');
-      setUserCity(session.user.user_metadata.city || 'Almenara');
-      setUserName(session.user.user_metadata.name || 'Usuário');
+      setUserRole(role || 'clerk');
+      setUserCity(city || 'Almenara');
+      setUserName(name || 'Usuário');
 
       // Resolve Councilman ID from Email/CPF
       const email = session.user.email || '';
       const cpf = email.split('@')[0];
       if (cpf) {
-        supabase.from('users').select('councilman_id, role').eq('cpf', cpf).single()
-          .then(({ data }) => {
-            if (data) {
-              if (data.councilman_id) setCurrentCouncilmanId(data.councilman_id);
-              if (data.role) setUserRole(data.role as 'clerk' | 'councilman' | 'president' | 'moderator');
-            }
-          });
+        const { data, error } = await supabase.from('users').select('councilman_id, role').eq('cpf', cpf).maybeSingle();
+        if (data) {
+          if (data.councilman_id) {
+            console.log('Context Resolved: Councilman ID =', data.councilman_id);
+            setCurrentCouncilmanId(data.councilman_id);
+          }
+          if (data.role) setUserRole(data.role as any);
+        } else if (error) {
+          console.error('Error resolving user context:', error);
+        }
       }
     };
 
@@ -383,12 +387,12 @@ const App: React.FC = () => {
     // Allow passing explicit status or toggling current based on local state (might be racey but ok for MVP)
     const councilman = councilmen.find(c => c.id === councilmanId);
     const newStatus = status !== undefined ? status : !councilman?.isRequestingFloor;
-    await supabase.from('councilmen').update({ isRequestingFloor: newStatus }).eq('id', councilmanId);
+    await supabase.from('councilmen').update({ is_requesting_floor: newStatus }).eq('id', councilmanId);
 
     if (status === false && activeSpeakerId === councilmanId) {
       setActiveSpeakerId(null);
       setSpeakingTimeElapsed(0);
-      await supabase.from('chamber_configs').update({ activeSpeakerId: null }).eq('city', userCity);
+      await supabase.from('chamber_configs').update({ active_speaker_id: null }).eq('city', userCity);
     }
   };
 
@@ -404,7 +408,7 @@ const App: React.FC = () => {
 
     const councilman = councilmen.find(c => c.id === id);
     const newStatus = status !== undefined ? status : !councilman?.isRequestingIntervention;
-    await supabase.from('councilmen').update({ isRequestingIntervention: newStatus }).eq('id', id);
+    await supabase.from('councilmen').update({ is_requesting_intervention: newStatus }).eq('id', id);
   };
 
   const handleAddCouncilman = (newCouncilman: Councilman) => {
@@ -430,22 +434,34 @@ const App: React.FC = () => {
       if (authError) throw authError;
 
       if (authData.user) {
-        // 2. If Councilman, create profile in 'councilmen' table
-        if (newAccount.role === 'councilman') {
+        const userId = authData.user.id;
+
+        // 2. Create entry in public.users table
+        const { error: userError } = await supabase.from('users').insert({
+          id: userId,
+          name: newAccount.name,
+          cpf: newAccount.cpf,
+          role: newAccount.role,
+          city: newAccount.city,
+          councilman_id: newAccount.role === 'councilman' || newAccount.role === 'president' ? userId : null
+        });
+
+        if (userError) throw userError;
+
+        // 3. If Councilman or President, create profile in 'councilmen' table
+        if (newAccount.role === 'councilman' || newAccount.role === 'president') {
           const { error: councilmanError } = await supabase.from('councilmen').insert({
+            id: userId,
             name: newAccount.name,
             party: newAccount.party || 'SEM PARTIDO',
             city: newAccount.city,
-            avatar: `https://picsum.photos/seed/${authData.user.id}/200/200`,
-            currentVote: 'PENDING',
-            isPresent: false
+            avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${newAccount.name}`,
+            current_vote: 'PENDING',
+            is_present: false
           });
 
           if (councilmanError) throw councilmanError;
         }
-
-        // 3. Link explicitly in public.users if needed by current logic
-        // (Not strictly necessary for the newAccount flow unless we update it to populate users table too, but for now focusing on requested Manoel/Claudio flow)
 
         alert('Conta criada com sucesso!');
         setAccounts(prev => [...prev, newAccount]);
@@ -479,7 +495,14 @@ const App: React.FC = () => {
   };
 
   const handleVote = async (councilmanId: string, vote: VoteValue) => {
-    await supabase.from('councilmen').update({ currentVote: vote }).eq('id', councilmanId);
+    // Optimistic Update
+    setCouncilmen(prev => prev.map(c => c.id === councilmanId ? { ...c, currentVote: vote } : c));
+
+    const { error } = await supabase.from('councilmen').update({ current_vote: vote }).eq('id', councilmanId);
+    if (error) {
+      console.error('Error voting:', error);
+      // Rollback or handle error (for now just log)
+    }
   };
 
   const handleCreateBill = async (newBill: Bill) => {
@@ -584,7 +607,7 @@ const App: React.FC = () => {
                 supabase.from('chamber_configs').update({ active_bill_id: null, active_speaker_id: null, is_voting_open: false }).eq('city', userCity).then();
                 // Reset votes in DB
                 councilmen.forEach(c => {
-                  supabase.from('councilmen').update({ currentVote: 'PENDING', isRequestingFloor: false }).eq('id', c.id).then();
+                  supabase.from('councilmen').update({ current_vote: 'PENDING', is_requesting_floor: false }).eq('id', c.id).then();
                 });
 
                 setActiveBillId(null);

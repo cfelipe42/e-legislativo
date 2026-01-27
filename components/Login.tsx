@@ -96,7 +96,7 @@ const Login: React.FC<LoginProps> = ({ onLogin, chamberConfigs }) => {
       // Fallback for non-numeric usernames like 'admin'
       emailPrefix = cpf.replace(/[^a-zA-Z0-9]/g, '').toLowerCase();
     }
-    const email = `${emailPrefix}@e-legislativo.com`;
+    const email = `${emailPrefix}@camara.leg.br`;
 
     // Tentar Login primeiro
     const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
@@ -105,15 +105,13 @@ const Login: React.FC<LoginProps> = ({ onLogin, chamberConfigs }) => {
     });
 
     if (signInError) {
-      if (signInError.message === 'Invalid login credentials') {
+      if (signInError.message === 'Invalid login credentials' || signInError.message.includes('Email not confirmed')) {
         // Para criar conta, AÍ SIM precisamos da cidade e role
         if (!city) {
           alert('Usuário não encontrado. Para criar um novo cadastro, selecione a Câmara e a Função desejada antes de fazer login.');
           return;
         }
 
-        // Se falhar e for o primeiro acesso, vamos tentar criar a conta (para facilitar testes)
-        // Em produção isso seria um fluxo de SignUp separado.
         const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
           email,
           password,
@@ -121,7 +119,7 @@ const Login: React.FC<LoginProps> = ({ onLogin, chamberConfigs }) => {
             data: {
               role: activeRole,
               city: city,
-              name: cpf // Usando o CPF como nome inicial
+              name: cpf
             }
           }
         });
@@ -132,7 +130,33 @@ const Login: React.FC<LoginProps> = ({ onLogin, chamberConfigs }) => {
         }
 
         if (signUpData.user) {
-          alert('Conta criada com sucesso! Faça login novamente.');
+          const userId = signUpData.user.id;
+
+          // Criar registro na tabela public.users
+          await supabase.from('users').insert({
+            id: userId,
+            name: cpf,
+            cpf: cpf,
+            role: activeRole,
+            city: city,
+            councilman_id: (activeRole === 'councilman' || activeRole === 'president') ? userId : null
+          });
+
+          // Se for Vereador ou Presidente, criar perfil na tabela councilmen
+          if (activeRole === 'councilman' || activeRole === 'president') {
+            await supabase.from('councilmen').insert({
+              id: userId,
+              name: `Vereador ${cpf}`,
+              party: 'A DEFINIR',
+              city: city,
+              avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${cpf}`,
+              current_vote: 'PENDING',
+              is_present: true // Inicializar como presente para testes
+            });
+          }
+
+          alert('Conta criada com sucesso! Carregando painel...');
+          onLogin(city, activeRole);
           return;
         }
       } else {
