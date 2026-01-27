@@ -20,8 +20,10 @@ interface VotingSessionProps {
   isVotingOpen?: boolean;
   onOpenVoting?: () => void;
   onOpenTransmission?: () => void;
+  onRingBell?: () => void;
   onlineUsers?: string[];
   userCity?: string;
+  isBellRingingFromSync?: boolean;
 }
 
 const VotingSession: React.FC<VotingSessionProps> = ({
@@ -41,8 +43,10 @@ const VotingSession: React.FC<VotingSessionProps> = ({
   isVotingOpen = false,
   onOpenVoting,
   onOpenTransmission,
+  onRingBell,
   onlineUsers = [],
-  userCity = ''
+  userCity = '',
+  isBellRingingFromSync = false
 }) => {
   const [showRequestToast, setShowRequestToast] = useState(false);
   const [isProcessingRequest, setIsProcessingRequest] = useState(false);
@@ -97,7 +101,13 @@ const VotingSession: React.FC<VotingSessionProps> = ({
     }
   };
 
-  const ringBell = () => {
+  useEffect(() => {
+    if (isBellRingingFromSync) {
+      ringBell(true); // Don't re-broadcast if it came from sync
+    }
+  }, [isBellRingingFromSync]);
+
+  const ringBell = (skipBroadcast = false) => {
     setIsBellRinging(true);
     setShowOrderAlert(true);
 
@@ -106,6 +116,10 @@ const VotingSession: React.FC<VotingSessionProps> = ({
     playTone(2550, 0.05, 0.4);
     playTone(2450, 0.1, 0.4);
     playTone(2600, 0.15, 0.4);
+
+    if (!skipBroadcast && onRingBell) {
+      onRingBell();
+    }
 
     setTimeout(() => {
       setIsBellRinging(false);

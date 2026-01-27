@@ -35,54 +35,73 @@ const App: React.FC = () => {
   const [bills, setBills] = useState<Bill[]>(INITIAL_BILLS);
   const [chamberConfigs, setChamberConfigs] = useState<ChamberConfig[]>(INITIAL_CHAMBER_CONFIGS);
   const [accounts, setAccounts] = useState<UserAccount[]>([]);
-  // Duplicate lines removed
+  // State variables initializations
   const [speakingTimeElapsed, setSpeakingTimeElapsed] = useState(0);
   const [activeSpeakerId, setActiveSpeakerId] = useState<string | null>(null);
   const [history, setHistory] = useState<SessionHistory[]>([]);
   const [onlineUsers, setOnlineUsers] = useState<Set<string>>(new Set());
   const timerRef = useRef<number | null>(null);
+  const channelRef = useRef<any>(null);
+  const [isBellRinging, setIsBellRinging] = useState(false);
 
   useEffect(() => {
     // Helper to resolve user context
     const resolveUserContext = async (session: any) => {
-      if (!session) return;
+      if (!session) {
+        setIsAuthenticated(false);
+        setCurrentCouncilmanId(undefined);
+        return;
+      }
 
-      const { role, city, name } = session.user.user_metadata;
-      setIsAuthenticated(true);
-      setUserRole(role || 'clerk');
-      setUserCity(city || 'Almenara');
-      setUserName(name || 'Usuário');
+      const { user } = session;
+      const meta = user.user_metadata;
 
-      // Resolve Councilman ID from Email/CPF
-      const email = session.user.email || '';
+      // Resolve details from 'users' table (source of truth)
+      const email = user.email || '';
       const cpf = email.split('@')[0];
+
+      let finalRole = meta.role || 'clerk';
+      let finalCity = meta.city || 'Almenara';
+      let finalName = meta.name || 'Usuário';
+      let councilmanId = meta.councilman_id;
+
       if (cpf) {
-        const { data, error } = await supabase.from('users').select('councilman_id, role').eq('cpf', cpf).maybeSingle();
+        const { data } = await supabase.from('users').select('*').eq('cpf', cpf).maybeSingle();
         if (data) {
-          if (data.councilman_id) {
-            console.log('Context Resolved: Councilman ID =', data.councilman_id);
-            setCurrentCouncilmanId(data.councilman_id);
-          }
-          if (data.role) setUserRole(data.role as any);
-        } else if (error) {
-          console.error('Error resolving user context:', error);
+          finalRole = data.role;
+          finalCity = data.city;
+          finalName = data.name;
+          councilmanId = data.councilman_id;
         }
+      }
+
+      // Batch state updates
+      setUserRole(finalRole);
+      setUserCity(finalCity);
+      setUserName(finalName);
+      if (councilmanId) setCurrentCouncilmanId(councilmanId);
+      setIsAuthenticated(true);
+
+      // Mark as present in DB
+      if (councilmanId) {
+        await supabase.from('councilmen').update({ is_present: true }).eq('id', councilmanId);
       }
     };
 
-    // Check initial session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session) resolveUserContext(session);
-    });
-
     // Listen for auth changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      console.log('Auth Event:', event);
       if (session) {
         resolveUserContext(session);
       } else {
         setIsAuthenticated(false);
         setCurrentCouncilmanId(undefined);
       }
+    });
+
+    // Check initial session
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session) resolveUserContext(session);
     });
 
     return () => subscription.unsubscribe();
@@ -129,8 +148,6 @@ const App: React.FC = () => {
 
   // Realtime Subscriptions
   useEffect(() => {
-    if (!isAuthenticated || !userCity) return;
-    // ... existing code ...
     // Listen to Chamber Config changes (Active Session)
     const configSub = supabase
       .channel('public:chamber_configs')
@@ -183,6 +200,8 @@ const App: React.FC = () => {
         } else if (payload.eventType === 'INSERT') {
           const mapped = mapCouncilman(payload.new);
           setCouncilmen(prev => [...prev, mapped]);
+        } else if (payload.eventType === 'DELETE') {
+          setCouncilmen(prev => prev.filter(c => c.id !== payload.old.id));
         }
       })
       .subscribe();
@@ -195,10 +214,12 @@ const App: React.FC = () => {
 
   // Presence Subscription (Scoped by city)
   useEffect(() => {
-    if (!isAuthenticated || !currentCouncilmanId || !userCity) return;
+    // We want to track everyone, but councilmen/presidents specifically by their ID
+    if (!isAuthenticated || !userCity) return;
 
     const channelName = `presence:${userCity}`;
     const channel = supabase.channel(channelName);
+    channelRef.current = channel;
 
     channel
       .on('presence', { event: 'sync' }, () => {
@@ -209,17 +230,17 @@ const App: React.FC = () => {
             if (p.councilmanId) onlineIds.add(p.councilmanId);
           });
         });
-        console.log('Online Users Sync:', Array.from(onlineIds));
         setOnlineUsers(onlineIds);
       })
-      .on('presence', { event: 'join' }, ({ key, newPresences }) => {
-        console.log('User Joined:', key, newPresences);
+      .on('broadcast', { event: 'bell' }, () => {
+        setIsBellRinging(true);
+        setTimeout(() => setIsBellRinging(false), 2000);
       })
       .subscribe(async (status) => {
         if (status === 'SUBSCRIBED') {
-          console.log('Presence Subscribed. Tracking ID:', currentCouncilmanId);
           await channel.track({
             councilmanId: currentCouncilmanId,
+            role: userRole,
             onlineAt: new Date().toISOString(),
           });
         }
@@ -228,7 +249,7 @@ const App: React.FC = () => {
     return () => {
       channel.unsubscribe();
     };
-  }, [isAuthenticated, currentCouncilmanId, userCity]);
+  }, [isAuthenticated, currentCouncilmanId, userCity, userRole]);
 
   // Sync Active Bill from loaded config
   useEffect(() => {
@@ -241,8 +262,8 @@ const App: React.FC = () => {
         setActiveTab('session');
       }
 
-      setActiveBillId(newActiveBillId);
-      setActiveSpeakerId(currentConfig.activeSpeakerId || null);
+      setActiveBillId(currentConfig.activeBillId ?? null);
+      setActiveSpeakerId(currentConfig.activeSpeakerId ?? null);
     }
   }, [chamberConfigs, userCity]);
 
@@ -269,13 +290,15 @@ const App: React.FC = () => {
           setBills(prev => prev.map(b => b.id === payload.new.id ? payload.new as Bill : b));
         } else if (payload.eventType === 'INSERT') {
           setBills(prev => [...prev, payload.new as Bill]);
+        } else if (payload.eventType === 'DELETE') {
+          setBills(prev => prev.filter(b => b.id !== payload.old.id));
         }
       })
       .subscribe();
 
     // 3. Fetch History
     const fetchHistory = async () => {
-      const { data } = await supabase.from('history').select('*').order('created_at', { ascending: false });
+      const { data } = await supabase.from('session_history').select('*').order('created_at', { ascending: false });
       if (data) {
         // Map DB columns to SessionHistory type if needed (snake_case to camelCase conversion mainly happens automatically if we used typed client, but here we cast)
         // Adjusting mapping: DB "bill_id" -> Type "billId", DB "individual_votes" -> "individualVotes"
@@ -292,8 +315,8 @@ const App: React.FC = () => {
     fetchHistory();
 
     const historySub = supabase
-      .channel('public:history')
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'history' }, payload => {
+      .channel('public:session_history')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'session_history' }, payload => {
         // Handle new history entry
         const h = payload.new;
         const newEntry: SessionHistory = {
@@ -595,7 +618,7 @@ const App: React.FC = () => {
                 supabase.from('bills').update({ status: newH.result.outcome }).eq('id', activeBillId).then();
 
                 // INSERT HISTORY
-                supabase.from('history').insert({
+                supabase.from('session_history').insert({
                   id: newH.id,
                   bill_id: newH.billId,
                   date: newH.date,
@@ -617,6 +640,8 @@ const App: React.FC = () => {
               activeSpeakerId={activeSpeakerId}
               speakingTimeElapsed={speakingTimeElapsed}
               userCity={userCity}
+              onRingBell={() => channelRef.current?.send({ type: 'broadcast', event: 'bell', payload: {} })}
+              isBellRingingFromSync={isBellRinging}
             />
           )}
           {activeTab === 'history' && <History history={history} />}
