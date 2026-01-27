@@ -413,7 +413,7 @@ const ModerationTab: React.FC<ModerationTabProps> = ({
                 <div className="col-span-2">
                   <label className="block text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-2">Perfil de Usuário</label>
                   <div className="grid grid-cols-4 gap-2">
-                    {['clerk', 'president', 'councilman', 'moderator'].map(role => (
+                    {['clerk', 'president', 'councilman', 'moderator', 'mesario'].map(role => (
                       <button
                         key={role} type="button"
                         onClick={() => setFormAccount({ ...formAccount, role: role as any })}

@@ -237,7 +237,8 @@ const Login: React.FC<LoginProps> = ({ onLogin, chamberConfigs }) => {
 
           <div className="flex border-b border-slate-100 bg-slate-50">
             {[
-              { id: 'clerk', label: 'Mesário', icon: 'fa-clipboard-check' },
+              { id: 'clerk', label: 'Secretário', icon: 'fa-file-signature' },
+              { id: 'mesario', label: 'Mesário', icon: 'fa-clipboard-check' },
               { id: 'president', label: 'Presidente', icon: 'fa-crown' },
               { id: 'councilman', label: 'Vereador', icon: 'fa-user-tie' },
               { id: 'moderator', label: 'Moderador', icon: 'fa-user-shield' }

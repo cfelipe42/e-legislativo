@@ -5,7 +5,7 @@ interface LayoutProps {
   children: React.ReactNode;
   activeTab: string;
   setActiveTab: (tab: string) => void;
-  userRole?: 'clerk' | 'councilman' | 'president' | 'moderator';
+  userRole?: 'clerk' | 'councilman' | 'president' | 'moderator' | 'mesario';
   userName?: string;
   userAvatar?: string;
   isOnline?: boolean;
@@ -31,7 +31,7 @@ const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab, user
 
   const isCouncilman = userRole === 'councilman';
   const isPresident = userRole === 'president';
-  const isClerk = userRole === 'clerk';
+  const isClerk = userRole === 'clerk' || userRole === 'mesario';
   const isModerator = userRole === 'moderator';
 
   // Filtra abas
@@ -112,7 +112,8 @@ const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab, user
               <p className="text-[10px] font-bold text-white/40 uppercase tracking-tighter">
                 {userRole === 'president' ? 'Vereador Presidente' :
                   userRole === 'councilman' ? 'Vereador(a)' :
-                    userRole === 'moderator' ? 'Administrador' : 'Mesário'}
+                    userRole === 'moderator' ? 'Administrador' :
+                      userRole === 'mesario' ? 'Mesário' : 'Secretaria Geral'}
               </p>
             </div>
           </div>

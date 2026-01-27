@@ -12,6 +12,7 @@ interface PlenaryDisplayProps {
   speakingTimeElapsed?: number;
   speakingTimeLimit?: number;
   onlineUsers?: string[];
+  isBellRinging?: boolean;
 }
 
 const PlenaryDisplay: React.FC<PlenaryDisplayProps> = ({
@@ -23,7 +24,8 @@ const PlenaryDisplay: React.FC<PlenaryDisplayProps> = ({
   activeSpeakerId,
   speakingTimeElapsed = 0,
   speakingTimeLimit = 600,
-  onlineUsers = []
+  onlineUsers = [],
+  isBellRinging = false
 }) => {
   const [showFullText, setShowFullText] = useState(false);
   const [currentTime, setCurrentTime] = useState(new Date());
@@ -56,7 +58,27 @@ const PlenaryDisplay: React.FC<PlenaryDisplayProps> = ({
         .animate-slide-right { animation: slide-right 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
         @keyframes modal-scale { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
         .animate-modal { animation: modal-scale 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+        @keyframes alert-bounce {
+          0%, 100% { transform: translateY(0) translateX(-50%); }
+          50% { transform: translateY(-10px) translateX(-50%); }
+        }
+        .animate-alert-bounce { animation: alert-bounce 0.5s infinite; }
       `}</style>
+
+      {/* Alerta de Ordem no Plenário via Realtime */}
+      {isBellRinging && (
+        <div className="fixed top-24 left-1/2 -translate-x-1/2 z-[300] animate-fadeIn">
+          <div className="bg-rose-700 text-white px-10 py-5 rounded-[2.5rem] shadow-[0_20px_60px_rgba(190,18,60,0.6)] border-4 border-rose-500/50 flex items-center gap-8 animate-alert-bounce">
+            <div className="bg-white/20 p-4 rounded-full animate-pulse">
+              <i className="fa-solid fa-triangle-exclamation text-3xl"></i>
+            </div>
+            <div className="flex flex-col">
+              <span className="font-black text-2xl uppercase tracking-[0.3em] leading-none">Silêncio!</span>
+              <span className="font-bold text-xs uppercase tracking-[0.4em] opacity-80 mt-2">Ordem no Plenário Requerida</span>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Modal de Leitura Integral do Projeto */}
       {showFullText && activeBill && (

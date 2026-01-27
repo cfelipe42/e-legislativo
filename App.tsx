@@ -271,13 +271,21 @@ const App: React.FC = () => {
   useEffect(() => {
     if (!isAuthenticated || !userCity) return;
 
+    const mapBill = (b: any): Bill => ({
+      id: b.id,
+      title: b.title,
+      description: b.description,
+      author: b.author,
+      category: b.category,
+      type: b.type,
+      status: b.status,
+      fullText: b.full_text || b.fullText || ''
+    });
+
     const fetchBills = async () => {
       const { data, error } = await supabase.from('bills').select('*');
-      if (!error && data && data.length > 0) {
-        // Transformar dados se necessário ou garantir que correspondem a Bill[]
-        // O tipo Bill da aplicação deve bater com o banco. 
-        // Assumindo mapeamento direto por enquanto.
-        setBills(data as any);
+      if (!error && data) {
+        setBills(data.map(mapBill));
       }
     };
 
@@ -287,9 +295,11 @@ const App: React.FC = () => {
       .channel('public:bills')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'bills' }, payload => {
         if (payload.eventType === 'UPDATE') {
-          setBills(prev => prev.map(b => b.id === payload.new.id ? payload.new as Bill : b));
+          const mapped = mapBill(payload.new);
+          setBills(prev => prev.map(b => b.id === mapped.id ? mapped : b));
         } else if (payload.eventType === 'INSERT') {
-          setBills(prev => [...prev, payload.new as Bill]);
+          const mapped = mapBill(payload.new);
+          setBills(prev => [...prev, mapped]);
         } else if (payload.eventType === 'DELETE') {
           setBills(prev => prev.filter(b => b.id !== payload.old.id));
         }
@@ -436,8 +446,29 @@ const App: React.FC = () => {
     await supabase.from('councilmen').update({ is_requesting_intervention: newStatus }).eq('id', id);
   };
 
-  const handleAddCouncilman = (newCouncilman: Councilman) => {
-    setCouncilmen(prev => [...prev, newCouncilman]);
+  const handleAddCouncilman = async (newCouncilman: Councilman) => {
+    // Apenas para garantir que o councilmanId seja o mesmo do banco se já existir
+    const { error } = await supabase.from('councilmen').insert({
+      id: newCouncilman.id || `C-${Date.now()}`,
+      name: newCouncilman.name,
+      party: newCouncilman.party,
+      city: userCity,
+      avatar: newCouncilman.avatar,
+      current_vote: 'PENDING',
+      is_present: false
+    });
+
+    if (error) alert('Erro ao adicionar vereador: ' + error.message);
+  };
+
+  const handleUpdateConfig = async (conf: ChamberConfig) => {
+    const { error } = await supabase.from('chamber_configs').update({
+      allowed_ip: conf.allowedIP,
+      is_active: conf.isActive
+      // Adicione outros campos se necessário
+    }).eq('city', conf.city);
+
+    if (error) alert('Erro ao atualizar configuração: ' + error.message);
   };
 
   const handleAddAccount = async (newAccount: UserAccount & { party?: string }) => {
@@ -530,13 +561,37 @@ const App: React.FC = () => {
     }
   };
 
+  const mapBillToDB = (b: Bill) => ({
+    id: b.id,
+    title: b.title,
+    description: b.description,
+    author: b.author,
+    category: b.category,
+    type: b.type,
+    status: b.status,
+    full_text: b.fullText
+  });
+
   const handleCreateBill = async (newBill: Bill) => {
-    const { error } = await supabase.from('bills').insert(newBill);
+    const { error } = await supabase.from('bills').insert(mapBillToDB(newBill));
     if (!error) {
-      setBills(prev => [...prev, newBill]);
-      alert('Projeto criado com sucesso!');
+      // O estado local será atualizado pelo subscription do Realtime
+      alert('Projeto criado com sucesso e salvo no banco de dados!');
     } else {
       alert('Erro ao criar projeto: ' + error.message);
+    }
+  };
+
+  const handleUpdateBill = async (updatedBill: Bill) => {
+    const { error } = await supabase.from('bills')
+      .update(mapBillToDB(updatedBill))
+      .eq('id', updatedBill.id);
+
+    if (!error) {
+      // O estado local será atualizado pelo subscription do Realtime
+      alert('Projeto atualizado com sucesso!');
+    } else {
+      alert('Erro ao atualizar projeto: ' + error.message);
     }
   };
 
@@ -567,7 +622,7 @@ const App: React.FC = () => {
           </div>
 
           {activeTab === 'dashboard' && <Dashboard bills={bills} history={history} userRole={userRole} currentCouncilman={councilmen.find(c => c.id === currentCouncilmanId)} />}
-          {activeTab === 'bills' && <BillsList bills={bills} onStartVoting={handleStartVoting} onCreateBill={handleCreateBill} onUpdateBill={(b) => setBills(prev => prev.map(old => old.id === b.id ? b : old))} userRole={userRole as any} />}
+          {activeTab === 'bills' && <BillsList bills={bills} onStartVoting={handleStartVoting} onCreateBill={handleCreateBill} onUpdateBill={handleUpdateBill} userRole={userRole as any} />}
           {activeTab === 'session' && (
 
             <VotingSession
@@ -647,12 +702,12 @@ const App: React.FC = () => {
             />
           )}
           {activeTab === 'history' && <History history={history} />}
-          {activeTab === 'plenary' && <PlenaryDisplay city={userCity} activeBill={activeBill} councilmen={councilmen} onBack={() => setActiveTab('session')} sessionTitle="Sessão Ordinária" activeSpeakerId={activeSpeakerId} speakingTimeElapsed={speakingTimeElapsed} onlineUsers={Array.from(onlineUsers)} />}
+          {activeTab === 'plenary' && <PlenaryDisplay city={userCity} activeBill={activeBill} councilmen={councilmen} onBack={() => setActiveTab('session')} sessionTitle="Sessão Ordinária" activeSpeakerId={activeSpeakerId} speakingTimeElapsed={speakingTimeElapsed} onlineUsers={Array.from(onlineUsers)} isBellRinging={isBellRinging} />}
           {activeTab === 'management' && <CouncilmenManagement councilmen={councilmen} onlineUsers={Array.from(onlineUsers)} onUpdateCouncilman={handleUpdateCouncilman} />}
           {activeTab === 'moderation' && userRole === 'moderator' && (
             <ModerationTab
               chamberConfigs={chamberConfigs}
-              onUpdateConfig={(conf) => setChamberConfigs(prev => prev.map(c => c.city === conf.city ? conf : c))}
+              onUpdateConfig={handleUpdateConfig}
               onSwitchCity={setUserCity}
               currentCity={userCity}
               councilmen={councilmen}
