@@ -8,11 +8,12 @@ interface BillsListProps {
   onUpdateBill: (updatedBill: Bill) => void;
   onCreateBill?: (bill: Bill) => void;
   userRole: 'clerk' | 'councilman' | 'president' | 'moderator' | 'mesario';
+  onReadBill: (bill: Bill) => void;
 }
 
 const ITEMS_PER_PAGE = 5;
 
-const BillsList: React.FC<BillsListProps> = ({ bills, onStartVoting, onUpdateBill, onCreateBill, userRole }) => {
+const BillsList: React.FC<BillsListProps> = ({ bills, onStartVoting, onUpdateBill, onCreateBill, userRole, onReadBill }) => {
   const [currentPage, setCurrentPage] = useState(1);
   const [searchTerm, setSearchTerm] = useState('');
   const [editingBill, setEditingBill] = useState<Bill | null>(null);
@@ -369,10 +370,10 @@ const BillsList: React.FC<BillsListProps> = ({ bills, onStartVoting, onUpdateBil
 
                 <div className="flex flex-wrap items-center gap-2">
                   <button
-                    onClick={() => alert(`TEXTO INTEGRAL: ${bill.title}\n\n${bill.description}\n\n[DADOS TÉCNICOS ADICIONAIS]\nStatus: ${bill.status}\nAutor: ${bill.author}`)}
-                    className="px-5 py-3 bg-slate-100 hover:bg-slate-200 text-slate-600 font-black text-[10px] uppercase tracking-widest rounded-xl transition-all border border-slate-200"
+                    onClick={() => onReadBill(bill)}
+                    className="px-5 py-3 bg-white hover:bg-slate-50 text-blue-600 font-black text-[10px] uppercase tracking-widest rounded-xl transition-all border border-blue-100 shadow-sm hover:shadow-md flex items-center gap-2 group"
                   >
-                    Ver Texto
+                    Ver Texto <i className="fa-solid fa-file-lines opacity-50 group-hover:opacity-100 transition-opacity"></i>
                   </button>
 
                   {/* Botão de Edição restrito a Presidente ou Mesário */}
@@ -415,38 +416,40 @@ const BillsList: React.FC<BillsListProps> = ({ bills, onStartVoting, onUpdateBil
       </div>
 
       {/* Controles de Paginação */}
-      {totalPages > 1 && (
-        <div className="flex items-center justify-center gap-2 pt-4">
-          <button
-            disabled={currentPage === 1}
-            onClick={() => handlePageChange(currentPage - 1)}
-            className="w-10 h-10 flex items-center justify-center rounded-xl bg-white border border-slate-200 text-slate-400 hover:text-blue-600 disabled:opacity-50 disabled:hover:text-slate-400 transition-all shadow-sm"
-          >
-            <i className="fa-solid fa-chevron-left text-xs"></i>
-          </button>
-
-          {[...Array(totalPages)].map((_, i) => (
+      {
+        totalPages > 1 && (
+          <div className="flex items-center justify-center gap-2 pt-4">
             <button
-              key={i}
-              onClick={() => handlePageChange(i + 1)}
-              className={`w-10 h-10 flex items-center justify-center rounded-xl text-xs font-black transition-all shadow-sm ${currentPage === i + 1
-                ? 'bg-blue-600 text-white border border-blue-500'
-                : 'bg-white text-slate-500 border border-slate-200 hover:border-blue-300 hover:text-blue-600'
-                }`}
+              disabled={currentPage === 1}
+              onClick={() => handlePageChange(currentPage - 1)}
+              className="w-10 h-10 flex items-center justify-center rounded-xl bg-white border border-slate-200 text-slate-400 hover:text-blue-600 disabled:opacity-50 disabled:hover:text-slate-400 transition-all shadow-sm"
             >
-              {i + 1}
+              <i className="fa-solid fa-chevron-left text-xs"></i>
             </button>
-          ))}
 
-          <button
-            disabled={currentPage === totalPages}
-            onClick={() => handlePageChange(currentPage + 1)}
-            className="w-10 h-10 flex items-center justify-center rounded-xl bg-white border border-slate-200 text-slate-400 hover:text-blue-600 disabled:opacity-50 disabled:hover:text-slate-400 transition-all shadow-sm"
-          >
-            <i className="fa-solid fa-chevron-right text-xs"></i>
-          </button>
-        </div>
-      )}
+            {[...Array(totalPages)].map((_, i) => (
+              <button
+                key={i}
+                onClick={() => handlePageChange(i + 1)}
+                className={`w-10 h-10 flex items-center justify-center rounded-xl text-xs font-black transition-all shadow-sm ${currentPage === i + 1
+                  ? 'bg-blue-600 text-white border border-blue-500'
+                  : 'bg-white text-slate-500 border border-slate-200 hover:border-blue-300 hover:text-blue-600'
+                  }`}
+              >
+                {i + 1}
+              </button>
+            ))}
+
+            <button
+              disabled={currentPage === totalPages}
+              onClick={() => handlePageChange(currentPage + 1)}
+              className="w-10 h-10 flex items-center justify-center rounded-xl bg-white border border-slate-200 text-slate-400 hover:text-blue-600 disabled:opacity-50 disabled:hover:text-slate-400 transition-all shadow-sm"
+            >
+              <i className="fa-solid fa-chevron-right text-xs"></i>
+            </button>
+          </div>
+        )
+      }
     </div>
   );
 };

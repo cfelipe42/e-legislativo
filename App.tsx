@@ -8,6 +8,7 @@ import BillsList from './components/BillsList';
 import CouncilmenManagement from './components/CouncilmenManagement';
 import ModerationTab from './components/ModerationTab';
 import History from './components/History';
+import BillDetailsView from './components/BillDetailsView';
 import Login from './components/Login';
 import { Councilman, Bill, SessionHistory, VoteValue, UserAccount, ChamberConfig } from './types';
 import { INITIAL_COUNCILMEN, INITIAL_BILLS } from './constants';
@@ -43,6 +44,7 @@ const App: React.FC = () => {
   const timerRef = useRef<number | null>(null);
   const channelRef = useRef<any>(null);
   const [isBellRinging, setIsBellRinging] = useState(false);
+  const [readingBill, setReadingBill] = useState<Bill | null>(null);
 
   useEffect(() => {
     // Helper to resolve user context
@@ -621,102 +623,113 @@ const App: React.FC = () => {
             </span>
           </div>
 
-          {activeTab === 'dashboard' && <Dashboard bills={bills} history={history} userRole={userRole} currentCouncilman={councilmen.find(c => c.id === currentCouncilmanId)} />}
-          {activeTab === 'bills' && <BillsList bills={bills} onStartVoting={handleStartVoting} onCreateBill={handleCreateBill} onUpdateBill={handleUpdateBill} userRole={userRole as any} />}
-          {activeTab === 'session' && (
-
-            <VotingSession
-              bills={bills} councilmen={councilmen} activeBill={activeBill}
-              onVote={handleVote}
-              onToggleFloorRequest={handleToggleFloorRequest}
-              onToggleInterventionRequest={handleToggleInterventionRequest}
-              onAuthorizeSpeech={async (id) => {
-                const startTime = new Date().toISOString();
-                setActiveSpeakerId(id);
-                setSpeakingTimeElapsed(0);
-                await supabase.from('chamber_configs').update({
-                  active_speaker_id: id,
-                  active_speaker_start_time: startTime
-                }).eq('city', userCity);
-              }}
-              onAddExtraTime={() => {
-                // To add time, we effectively push the start time back
-                // New elapsed = Old elapsed - 300
-                // New Start = Now - (Old elapsed - 300)
-                // This is complex, easier to just manipulate local for now OR update start_time
-                // For "Live" sync, better to update start_time:
-                // New Start Time = Current Start Time + 5 minutes? No, that Reduces elapsed.
-                // We want to reduce elapsed time by 5 mins.
-                // So new Start Time = Current Start Time + 5 minutes.
-                const config = chamberConfigs.find(c => c.city === userCity);
-                if (config?.activeSpeakerStartTime) {
-                  const newStart = new Date(new Date(config.activeSpeakerStartTime).getTime() + (5 * 60 * 1000)).toISOString();
-                  supabase.from('chamber_configs').update({ active_speaker_start_time: newStart }).eq('city', userCity).then();
-                }
-              }}
-
-              // New Props for Voting Phase
-              connectedCouncilmanId={currentCouncilmanId}
-              isVotingOpen={chamberConfigs.find(c => c.city === userCity)?.isVotingOpen || false}
-              onOpenVoting={handleOpenVoting}
-              onOpenTransmission={handleOpenTransmission}
-              onlineUsers={Array.from(onlineUsers)}
-
-              onComplete={(stats) => {
-                const newH: SessionHistory = {
-                  id: `S-${Date.now()}`, billId: activeBillId!, date: new Date().toLocaleDateString(),
-                  result: { ...stats, outcome: stats.yes > stats.no ? 'APPROVED' : 'REJECTED' },
-                  individualVotes: councilmen.map(c => ({ councilmanId: c.id, councilmanName: c.name, party: c.party, vote: c.currentVote }))
-                };
-                setHistory(prev => [newH, ...prev]);
-                setBills(prev => prev.map(b => b.id === activeBillId ? { ...b, status: newH.result.outcome } : b));
-
-                // UPDATE SUPABASE: Save Bill Status
-                supabase.from('bills').update({ status: newH.result.outcome }).eq('id', activeBillId).then();
-
-                // INSERT HISTORY
-                supabase.from('session_history').insert({
-                  id: newH.id,
-                  bill_id: newH.billId,
-                  date: newH.date,
-                  result: newH.result,
-                  individual_votes: newH.individualVotes
-                }).then();
-
-                // Clear active session in DB
-                supabase.from('chamber_configs').update({ active_bill_id: null, active_speaker_id: null, is_voting_open: false }).eq('city', userCity).then();
-                // Reset votes in DB
-                councilmen.forEach(c => {
-                  supabase.from('councilmen').update({ current_vote: 'PENDING', is_requesting_floor: false }).eq('id', c.id).then();
-                });
-
-                setActiveBillId(null);
-                setActiveTab('dashboard');
-              }}
-              userRole={userRole}
-              activeSpeakerId={activeSpeakerId}
-              speakingTimeElapsed={speakingTimeElapsed}
-              userCity={userCity}
-              onRingBell={() => channelRef.current?.send({ type: 'broadcast', event: 'bell', payload: {} })}
-              isBellRingingFromSync={isBellRinging}
-            />
-          )}
-          {activeTab === 'history' && <History history={history} />}
-          {activeTab === 'plenary' && <PlenaryDisplay city={userCity} activeBill={activeBill} councilmen={councilmen} onBack={() => setActiveTab('session')} sessionTitle="Sessão Ordinária" activeSpeakerId={activeSpeakerId} speakingTimeElapsed={speakingTimeElapsed} onlineUsers={Array.from(onlineUsers)} isBellRinging={isBellRinging} />}
-          {activeTab === 'management' && <CouncilmenManagement councilmen={councilmen} onlineUsers={Array.from(onlineUsers)} onUpdateCouncilman={handleUpdateCouncilman} />}
-          {activeTab === 'moderation' && userRole === 'moderator' && (
-            <ModerationTab
-              chamberConfigs={chamberConfigs}
-              onUpdateConfig={handleUpdateConfig}
-              onSwitchCity={setUserCity}
-              currentCity={userCity}
-              councilmen={councilmen}
-              onUpdateCouncilman={handleUpdateCouncilman}
-              onAddCouncilman={handleAddCouncilman}
-              accounts={accounts}
-              onAddAccount={handleAddAccount}
-              onlineUsers={Array.from(onlineUsers)}
-            />
+          {readingBill ? (
+            <BillDetailsView bill={readingBill} onBack={() => setReadingBill(null)} />
+          ) : (
+            <>
+              {activeTab === 'dashboard' && <Dashboard bills={bills} history={history} userRole={userRole} currentCouncilman={councilmen.find(c => c.id === currentCouncilmanId)} />}
+              {activeTab === 'bills' && (
+                <BillsList
+                  bills={bills}
+                  onStartVoting={handleStartVoting}
+                  onCreateBill={handleCreateBill}
+                  onUpdateBill={handleUpdateBill}
+                  userRole={userRole as any}
+                  onReadBill={setReadingBill}
+                />
+              )}
+              {activeTab === 'session' && (
+                <VotingSession
+                  bills={bills}
+                  councilmen={councilmen}
+                  activeBill={activeBill}
+                  onVote={handleVote}
+                  onToggleFloorRequest={handleToggleFloorRequest}
+                  onToggleInterventionRequest={handleToggleInterventionRequest}
+                  onAuthorizeSpeech={async (id) => {
+                    const startTime = new Date().toISOString();
+                    setActiveSpeakerId(id);
+                    setSpeakingTimeElapsed(0);
+                    await supabase.from('chamber_configs').update({
+                      active_speaker_id: id,
+                      active_speaker_start_time: startTime
+                    }).eq('city', userCity);
+                  }}
+                  onAddExtraTime={() => {
+                    const config = chamberConfigs.find(c => c.city === userCity);
+                    if (config?.activeSpeakerStartTime) {
+                      const newStart = new Date(new Date(config.activeSpeakerStartTime).getTime() + (5 * 60 * 1000)).toISOString();
+                      supabase.from('chamber_configs').update({ active_speaker_start_time: newStart }).eq('city', userCity).then();
+                    }
+                  }}
+                  connectedCouncilmanId={currentCouncilmanId}
+                  isVotingOpen={chamberConfigs.find(c => c.city === userCity)?.isVotingOpen || false}
+                  onOpenVoting={handleOpenVoting}
+                  onOpenTransmission={handleOpenTransmission}
+                  onlineUsers={Array.from(onlineUsers)}
+                  onComplete={(stats) => {
+                    const newH: SessionHistory = {
+                      id: `S-${Date.now()}`,
+                      billId: activeBillId!,
+                      date: new Date().toLocaleDateString(),
+                      result: { ...stats, outcome: stats.yes > stats.no ? 'APPROVED' : 'REJECTED' },
+                      individualVotes: councilmen.map(c => ({ councilmanId: c.id, councilmanName: c.name, party: c.party, vote: c.currentVote }))
+                    };
+                    setHistory(prev => [newH, ...prev]);
+                    setBills(prev => prev.map(b => b.id === activeBillId ? { ...b, status: newH.result.outcome } : b));
+                    supabase.from('bills').update({ status: newH.result.outcome }).eq('id', activeBillId).then();
+                    supabase.from('session_history').insert({
+                      id: newH.id,
+                      bill_id: newH.billId,
+                      date: newH.date,
+                      result: newH.result,
+                      individual_votes: newH.individualVotes
+                    }).then();
+                    supabase.from('chamber_configs').update({ active_bill_id: null, active_speaker_id: null, is_voting_open: false }).eq('city', userCity).then();
+                    councilmen.forEach(c => {
+                      supabase.from('councilmen').update({ current_vote: 'PENDING', is_requesting_floor: false }).eq('id', c.id).then();
+                    });
+                    setActiveBillId(null);
+                    setActiveTab('dashboard');
+                  }}
+                  userRole={userRole}
+                  activeSpeakerId={activeSpeakerId}
+                  speakingTimeElapsed={speakingTimeElapsed}
+                  userCity={userCity}
+                  onRingBell={() => channelRef.current?.send({ type: 'broadcast', event: 'bell', payload: {} })}
+                  isBellRingingFromSync={isBellRinging}
+                />
+              )}
+              {activeTab === 'history' && <History history={history} />}
+              {activeTab === 'plenary' && (
+                <PlenaryDisplay
+                  city={userCity}
+                  activeBill={activeBill}
+                  councilmen={councilmen}
+                  onBack={() => setActiveTab('session')}
+                  sessionTitle="Sessão Ordinária"
+                  activeSpeakerId={activeSpeakerId}
+                  speakingTimeElapsed={speakingTimeElapsed}
+                  onlineUsers={Array.from(onlineUsers)}
+                  isBellRinging={isBellRinging}
+                />
+              )}
+              {activeTab === 'management' && <CouncilmenManagement councilmen={councilmen} onlineUsers={Array.from(onlineUsers)} onUpdateCouncilman={handleUpdateCouncilman} />}
+              {activeTab === 'moderation' && userRole === 'moderator' && (
+                <ModerationTab
+                  chamberConfigs={chamberConfigs}
+                  onUpdateConfig={handleUpdateConfig}
+                  onSwitchCity={setUserCity}
+                  currentCity={userCity}
+                  councilmen={councilmen}
+                  onUpdateCouncilman={handleUpdateCouncilman}
+                  onAddCouncilman={handleAddCouncilman}
+                  accounts={accounts}
+                  onAddAccount={handleAddAccount}
+                  onlineUsers={Array.from(onlineUsers)}
+                />
+              )}
+            </>
           )}
         </Layout>
       )}
